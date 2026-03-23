@@ -5,6 +5,7 @@ import AdminProducts from './AdminProducts';
 import AdminUsers from './AdminUsers';
 import AdminTransactions from './AdminTransactions';
 import AdminDebts from './AdminDebts';
+import AdminCashIn from './AdminCashIn';
 import AdminReports from './AdminReports';
 import AdminSettings from './AdminSettings';
 
@@ -18,6 +19,7 @@ export default function AdminPage() {
           case 'users': return <AdminUsers />;
           case 'transactions': return <AdminTransactions />;
           case 'debts': return <AdminDebts />;
+          case 'cashin': return <AdminCashIn />;
           case 'reports': return <AdminReports />;
           case 'settings': return <AdminSettings />;
           default: return <AdminDashboard />;

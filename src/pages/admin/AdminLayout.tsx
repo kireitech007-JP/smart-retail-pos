@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { 
   LayoutDashboard, Package, Users, Receipt, FileText, Settings, LogOut, 
-  CreditCard, Store, ChevronLeft, ChevronRight, AlertTriangle, Menu
+  CreditCard, Store, ChevronLeft, ChevronRight, AlertTriangle, Menu, DollarSign
 } from 'lucide-react';
 
 const menuItems = [
@@ -11,6 +11,7 @@ const menuItems = [
   { id: 'users', label: 'Pengguna', icon: Users },
   { id: 'transactions', label: 'Transaksi', icon: Receipt },
   { id: 'debts', label: 'Piutang', icon: CreditCard },
+  { id: 'cashin', label: 'Kas Masuk', icon: DollarSign },
   { id: 'reports', label: 'Laporan', icon: FileText },
   { id: 'settings', label: 'Pengaturan', icon: Settings },
 ];

@@ -18,6 +18,7 @@ export interface Product {
 export interface Unit {
   id: string;
   name: string;
+  address?: string;
   cashierId?: string;
 }
 
@@ -82,6 +83,19 @@ export interface Expense {
   cashierId: string;
 }
 
+export interface CashIn {
+  id: string;
+  date: string;
+  description: string;
+  amount: number;
+  depositorName: string;
+  unitId: string;
+  unitName: string;
+  cashierId: string;
+  cashierName: string;
+  sessionId: string;
+}
+
 export interface CashierSession {
   id: string;
   cashierId: string;
@@ -93,6 +107,7 @@ export interface CashierSession {
   isOpen: boolean;
   transactions: string[];
   expenses: string[];
+  cashIns: string[];
 }
 
 export interface StoreSettings {
@@ -112,6 +127,7 @@ interface AppState {
   transactions: Transaction[];
   debts: Debt[];
   expenses: Expense[];
+  cashIns: CashIn[];
   cashierSessions: CashierSession[];
   storeSettings: StoreSettings;
   cart: { productId: string; qty: number }[];
@@ -123,6 +139,7 @@ interface AppContextType extends AppState {
   completeSetup: (adminName: string, adminUsername: string, adminPassword: string, storeName: string) => void;
   addUser: (user: Omit<User, 'id'>) => void;
   deleteUser: (id: string) => void;
+  updateUser: (user: User) => void;
   addUnit: (unit: Omit<Unit, 'id'>) => void;
   deleteUnit: (id: string) => void;
   updateUnit: (unit: Unit) => void;
@@ -137,6 +154,7 @@ interface AppContextType extends AppState {
   addDebt: (debt: Omit<Debt, 'id' | 'payments' | 'status'>) => void;
   payDebt: (debtId: string, amount: number) => void;
   addExpense: (expense: Omit<Expense, 'id'>) => void;
+  addCashIn: (cashIn: Omit<CashIn, 'id'>) => void;
   openCashierSession: (cashierId: string, unitId: string, openingCash: number) => void;
   closeCashierSession: (sessionId: string, closingCash: number) => void;
   getActiveSession: (cashierId: string) => CashierSession | undefined;
@@ -162,6 +180,7 @@ function loadState(): AppState {
     transactions: [],
     debts: [],
     expenses: [],
+    cashIns: [],
     cashierSessions: [],
     storeSettings: { storeName: '', phone: '', address: '', appsScriptUrl: '', recoveryEmail: '' },
     cart: [],
@@ -193,13 +212,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => update({ currentUser: null, cart: [] }), [update]);
 
   const completeSetup = useCallback((adminName: string, adminUsername: string, adminPassword: string, storeName: string) => {
-    const admin: User = { id: genId(), username: adminUsername, password: adminPassword, role: 'admin', name: adminName };
-    update({
+    const adminUser: User = { id: genId(), name: adminName, username: adminUsername, password: adminPassword, role: 'admin' };
+    const firstUnit: Unit = { id: genId(), name: 'Unit Utama', address: '' };
+    const cashierUser: User = { 
+      id: genId(), 
+      name: 'Kasir Default', 
+      username: 'kasir', 
+      password: 'kasir', 
+      role: 'cashier',
+      unitId: firstUnit.id 
+    };
+    setState(p => ({
+      ...p,
       isSetup: true,
-      users: [admin],
-      storeSettings: { ...state.storeSettings, storeName },
-    });
-  }, [state.storeSettings, update]);
+      users: [adminUser, cashierUser],
+      units: [firstUnit],
+      storeSettings: { storeName, phone: '', address: '', appsScriptUrl: '', recoveryEmail: '' },
+    }));
+  }, []);
 
   const addUser = useCallback((user: Omit<User, 'id'>) => {
     setState(p => ({ ...p, users: [...p.users, { ...user, id: genId() }] }));
@@ -326,13 +356,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const addCashIn = useCallback((cashIn: Omit<CashIn, 'id'>) => {
+    setState(p => {
+      const newCashIn = { ...cashIn, id: genId() };
+      const updatedSessions = p.cashierSessions.map(s => {
+        if (s.id === cashIn.sessionId) {
+          return { ...s, cashIns: [...(s.cashIns || []), newCashIn.id] };
+        }
+        return s;
+      });
+      return { ...p, cashIns: [...p.cashIns, newCashIn], cashierSessions: updatedSessions };
+    });
+  }, []);
+
   const openCashierSession = useCallback((cashierId: string, unitId: string, openingCash: number) => {
+    console.log('openCashierSession called:', { cashierId, unitId, openingCash });
+    const newSession = {
+      id: genId(), 
+      cashierId, 
+      unitId, 
+      openingCash,
+      startTime: new Date().toISOString(), 
+      isOpen: true, 
+      transactions: [], 
+      expenses: [], 
+      cashIns: [],
+    };
+    console.log('Creating new session:', newSession);
+    
     setState(p => ({
       ...p,
-      cashierSessions: [...p.cashierSessions, {
-        id: genId(), cashierId, unitId, openingCash,
-        startTime: new Date().toISOString(), isOpen: true, transactions: [], expenses: [],
-      }],
+      cashierSessions: [...p.cashierSessions, newSession],
     }));
   }, []);
 
@@ -346,7 +400,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getActiveSession = useCallback((cashierId: string) => {
-    return state.cashierSessions.find(s => s.cashierId === cashierId && s.isOpen);
+    const session = state.cashierSessions.find(s => s.cashierId === cashierId && s.isOpen);
+    console.log('getActiveSession for', cashierId, ':', session);
+    console.log('All sessions:', state.cashierSessions);
+    return session;
   }, [state.cashierSessions]);
 
   const updateStoreSettings = useCallback((settings: Partial<StoreSettings>) => {
@@ -360,7 +417,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...state, login, logout, completeSetup, addUser, deleteUser, updateUser,
       addUnit, deleteUnit, updateUnit, addProduct, updateProduct, deleteProduct,
       addToCart, removeFromCart, clearCart, updateCartQty,
-      submitTransaction, addDebt, payDebt, addExpense,
+      submitTransaction, addDebt, payDebt, addExpense, addCashIn,
       openCashierSession, closeCashierSession, getActiveSession,
       updateStoreSettings, getProductStock,
     }}>

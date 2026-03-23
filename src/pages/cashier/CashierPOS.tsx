@@ -7,13 +7,15 @@ import {
   Printer, Download, MessageSquare, Clock, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CashIn from '@/components/CashIn';
+import CashierDashboard from '@/components/CashierDashboard';
 
 export default function CashierPOS() {
   const { 
     currentUser, products, units, cart, addToCart, removeFromCart, clearCart, updateCartQty,
     submitTransaction, addDebt, addExpense, logout, getProductStock, storeSettings,
     openCashierSession, closeCashierSession, getActiveSession, cashierSessions,
-    transactions, expenses, debts, payDebt
+    transactions, expenses, debts, payDebt, cashIns
   } = useApp();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,7 +26,7 @@ export default function CashierPOS() {
   const [showInvoice, setShowInvoice] = useState<Transaction | null>(null);
   const [showCashierOpen, setShowCashierOpen] = useState(false);
   const [showCashierClose, setShowCashierClose] = useState(false);
-  const [activePage, setActivePage] = useState<'pos' | 'expense' | 'debt'>('pos');
+  const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'expense' | 'debt'>('dashboard');
 
   // Payment state
   const [paymentType, setPaymentType] = useState<'cash' | 'transfer' | 'credit'>('cash');
@@ -164,24 +166,23 @@ export default function CashierPOS() {
   // Session report data
   const sessionTx = activeSession ? transactions.filter(t => activeSession.transactions.includes(t.id)) : [];
   const sessionExp = activeSession ? expenses.filter(e => activeSession.expenses.includes(e.id)) : [];
+  const sessionCashIn = activeSession ? cashIns.filter(c => activeSession.cashIns?.includes(c.id)) : [];
   const sessionSales = sessionTx.reduce((s, t) => s + t.grandTotal, 0);
   const sessionExpTotal = sessionExp.reduce((s, e) => s + e.amount, 0);
+  const sessionCashInTotal = sessionCashIn.reduce((s, c) => s + c.amount, 0);
 
-  if (!activeSession && !showCashierOpen) {
+  if (!activeSession && !['dashboard', 'cashin'].includes(activePage)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="bg-card rounded-xl shadow-elevated p-8 max-w-md w-full text-center animate-fade-in">
           <div className="w-16 h-16 rounded-2xl primary-gradient flex items-center justify-center mx-auto mb-4">
             <Wallet className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h2 className="text-xl font-bold text-foreground mb-2">Buka Kasir</h2>
-          <p className="text-muted-foreground text-sm mb-6">Masukkan modal awal untuk memulai</p>
-          <div className="mb-4">
-            <input type="number" value={openingCash || ''} onChange={e => setOpeningCash(Number(e.target.value))}
-              placeholder="Modal awal (Rp)" className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary" />
-          </div>
-          <button onClick={() => { setShowCashierOpen(true); handleOpenSession(); }}
-            className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">Buka Kasir</button>
+          <h2 className="text-xl font-bold text-foreground mb-2">Buka Kasir Terlebih Dahulu</h2>
+          <p className="text-muted-foreground text-sm mb-6">Buka sesi kasir di Dashboard untuk memulai transaksi</p>
+          <button onClick={() => setActivePage('dashboard')} className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">
+            Menuju Dashboard
+          </button>
           <button onClick={logout} className="mt-4 text-sm text-muted-foreground hover:text-foreground">Logout</button>
         </div>
       </div>
@@ -202,10 +203,10 @@ export default function CashierPOS() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {['pos', 'expense', 'debt'].map(page => (
+          {['dashboard', 'cashin', 'pos', 'expense', 'debt'].map(page => (
             <button key={page} onClick={() => setActivePage(page as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-              {page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
+              {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
             </button>
           ))}
           <button onClick={() => setShowCashierClose(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20">
@@ -214,6 +215,18 @@ export default function CashierPOS() {
           <button onClick={logout} className="p-2 rounded-lg hover:bg-muted"><LogOut className="w-4 h-4 text-muted-foreground" /></button>
         </div>
       </header>
+
+      {activePage === 'dashboard' && (
+        <div className="flex-1 overflow-y-auto">
+          <CashierDashboard />
+        </div>
+      )}
+
+      {activePage === 'cashin' && (
+        <div className="flex-1 p-6 overflow-y-auto">
+          <CashIn />
+        </div>
+      )}
 
       {activePage === 'pos' && (
         <div className="flex-1 flex overflow-hidden">
@@ -318,6 +331,7 @@ export default function CashierPOS() {
       {activePage === 'expense' && (
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-lg mx-auto space-y-6">
+            <CashIn />
             <div className="bg-card rounded-xl p-6 shadow-card">
               <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
                 <TrendingDown className="w-5 h-5 text-primary" /> Tambah Pengeluaran
@@ -586,10 +600,11 @@ export default function CashierPOS() {
               <div className="bg-muted/50 rounded-lg p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Modal Awal</span><span className="text-foreground font-medium">{formatRupiah(activeSession.openingCash)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Total Penjualan</span><span className="text-success font-medium">{formatRupiah(sessionSales)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Total Kas Masuk</span><span className="text-success font-medium">{formatRupiah(sessionCashInTotal)}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Total Pengeluaran</span><span className="text-destructive font-medium">{formatRupiah(sessionExpTotal)}</span></div>
                 <div className="flex justify-between pt-2 border-t border-border font-bold">
                   <span className="text-foreground">Saldo Akhir</span>
-                  <span className="text-primary">{formatRupiah(activeSession.openingCash + sessionSales - sessionExpTotal)}</span>
+                  <span className="text-primary">{formatRupiah(activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal)}</span>
                 </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Jumlah Transaksi</span><span className="text-foreground">{sessionTx.length}</span></div>
               </div>

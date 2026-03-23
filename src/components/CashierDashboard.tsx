@@ -1,0 +1,350 @@
+import React, { useState, useMemo } from 'react';
+import { useApp } from '@/contexts/AppContext';
+import { formatRupiah, formatDateTime, isToday } from '@/lib/format';
+import { 
+  Wallet, DollarSign, CreditCard, TrendingUp, TrendingDown, 
+  Receipt, Users, Calendar, Search, Eye, EyeOff, RefreshCw
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+export default function CashierDashboard() {
+  const { 
+    currentUser, units, transactions, expenses, debts, payDebt, 
+    openCashierSession, closeCashierSession, getActiveSession, cashierSessions,
+    cashIns, getProductStock, products
+  } = useApp();
+
+  const [openingCash, setOpeningCash] = useState(0);
+  const [showDetails, setShowDetails] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const activeSession = currentUser ? getActiveSession(currentUser.id) : null;
+  const userUnit = units.find(u => u.id === currentUser?.unitId);
+
+  // Calculate today's data
+  const todayData = useMemo(() => {
+    const today = new Date().toDateString();
+    
+    const sessionTx = activeSession ? transactions.filter(t => 
+      activeSession.transactions.includes(t.id)
+    ) : transactions.filter(t => isToday(t.date) && t.unitId === userUnit?.id);
+    
+    const sessionExp = activeSession ? expenses.filter(e => 
+      activeSession.expenses.includes(e.id)
+    ) : expenses.filter(e => isToday(e.date) && e.unitId === userUnit?.id);
+    
+    const sessionCashIn = activeSession ? cashIns.filter(c => 
+      activeSession.cashIns?.includes(c.id)
+    ) : cashIns.filter(c => isToday(c.date) && c.unitId === userUnit?.id);
+
+    const cashTransactions = sessionTx.filter(t => t.paymentType === 'cash');
+    const transferTransactions = sessionTx.filter(t => t.paymentType === 'transfer');
+    const creditTransactions = sessionTx.filter(t => t.paymentType === 'credit');
+    
+    const creditDP = creditTransactions.reduce((sum, t) => sum + (t.dp || 0), 0);
+    const creditFull = creditTransactions.filter(t => !t.dp || t.dp === t.grandTotal).reduce((sum, t) => sum + t.grandTotal, 0);
+    const creditInstallment = creditDP > 0 ? creditDP : creditTransactions.reduce((sum, t) => sum + t.grandTotal, 0) - creditFull;
+
+    const paidDebts = debts.filter(d => 
+      d.unitId === userUnit?.id && 
+      d.payments?.some(p => isToday(p.date))
+    );
+
+    const totalPaidToday = paidDebts.reduce((sum, d) => {
+      const todayPayments = d.payments?.filter(p => isToday(p.date)) || [];
+      return sum + todayPayments.reduce((ps, p) => ps + p.amount, 0);
+    }, 0);
+
+    const totalCash = cashTransactions.reduce((sum, t) => sum + t.grandTotal, 0);
+    const totalTransfer = transferTransactions.reduce((sum, t) => sum + t.grandTotal, 0);
+    const totalExpenses = sessionExp.reduce((sum, e) => sum + e.amount, 0);
+    const totalCashIn = sessionCashIn.reduce((sum, c) => sum + c.amount, 0);
+
+    const expectedCash = (activeSession?.openingCash || openingCash) + totalCash + totalCashIn + totalPaidToday - totalExpenses;
+
+    return {
+      openingCash: activeSession?.openingCash || openingCash,
+      totalCash,
+      totalTransfer,
+      creditDP,
+      creditFull,
+      creditInstallment,
+      totalPaidToday,
+      totalExpenses,
+      expectedCash,
+      transactionCount: sessionTx.length,
+      transactions: sessionTx
+    };
+  }, [activeSession, transactions, expenses, cashIns, debts, userUnit, openingCash]);
+
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery) return todayData.transactions;
+    const q = searchQuery.toLowerCase();
+    return todayData.transactions.filter(t => 
+      t.customerName?.toLowerCase().includes(q) ||
+      t.id.toLowerCase().includes(q) ||
+      t.items.some(item => item.productName.toLowerCase().includes(q))
+    );
+  }, [todayData.transactions, searchQuery]);
+
+  const handleOpenSession = () => {
+    console.log('Opening session:', { currentUser, openingCash });
+    
+    if (!currentUser) {
+      toast.error('User tidak ditemukan');
+      return;
+    }
+    
+    if (!currentUser.unitId) {
+      toast.error('User tidak memiliki unit. Hubungi admin untuk setup unit.');
+      console.log('User missing unitId:', currentUser);
+      return;
+    }
+    
+    if (openingCash <= 0) {
+      toast.error('Modal awal harus lebih dari 0');
+      return;
+    }
+    
+    console.log('Calling openCashierSession with:', currentUser.id, currentUser.unitId, openingCash);
+    openCashierSession(currentUser.id, currentUser.unitId, openingCash);
+    toast.success('Kasir dibuka dengan modal ' + formatRupiah(openingCash));
+  };
+
+  const handleCloseSession = () => {
+    if (!activeSession) return;
+    closeCashierSession(activeSession.id, todayData.expectedCash);
+    toast.success('Kasir ditutup');
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Header */}
+      <div className="bg-card rounded-xl p-6 shadow-card">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg primary-gradient flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Dashboard Kasir</h1>
+              <p className="text-sm text-muted-foreground">
+                {currentUser?.name} • {userUnit?.name} 
+                {currentUser?.unitId ? ` (ID: ${currentUser.unitId})` : ' (No Unit ID)'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {!activeSession ? (
+              <button 
+                onClick={handleOpenSession}
+                className="flex items-center gap-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90"
+              >
+                <RefreshCw className="w-4 h-4" /> Buka Kasir
+              </button>
+            ) : (
+              <button 
+                onClick={handleCloseSession}
+                className="flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg text-sm font-medium hover:bg-destructive/90"
+              >
+                <EyeOff className="w-4 h-4" /> Tutup Kasir
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Opening Cash Input */}
+        {!activeSession && (
+          <div className="bg-muted/50 rounded-lg p-4">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Modal Awal</label>
+            <input 
+              type="number" 
+              value={openingCash || ''} 
+              onChange={(e) => {
+                console.log('Opening cash input:', e.target.value);
+                setOpeningCash(Number(e.target.value));
+              }}
+              placeholder="Masukkan modal awal" 
+              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-primary" 
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <Wallet className="w-4 h-4 text-blue-600" />
+            <span className="text-xs text-muted-foreground">Modal Awal</span>
+          </div>
+          <p className="text-lg font-bold text-foreground">{formatRupiah(todayData.openingCash)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <DollarSign className="w-4 h-4 text-green-600" />
+            <span className="text-xs text-muted-foreground">Tunai</span>
+          </div>
+          <p className="text-lg font-bold text-green-600">{formatRupiah(todayData.totalCash)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="w-4 h-4 text-blue-600" />
+            <span className="text-xs text-muted-foreground">Transfer</span>
+          </div>
+          <p className="text-lg font-bold text-blue-600">{formatRupiah(todayData.totalTransfer)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="w-4 h-4 text-purple-600" />
+            <span className="text-xs text-muted-foreground">Kredit (DP)</span>
+          </div>
+          <p className="text-lg font-bold text-purple-600">{formatRupiah(todayData.creditDP)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="w-4 h-4 text-indigo-600" />
+            <span className="text-xs text-muted-foreground">Kredit (Penuh)</span>
+          </div>
+          <p className="text-lg font-bold text-indigo-600">{formatRupiah(todayData.creditFull)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <CreditCard className="w-4 h-4 text-pink-600" />
+            <span className="text-xs text-muted-foreground">Kredit (Cicilan)</span>
+          </div>
+          <p className="text-lg font-bold text-pink-600">{formatRupiah(todayData.creditInstallment)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-4 h-4 text-green-600" />
+            <span className="text-xs text-muted-foreground">Lunas Piutang</span>
+          </div>
+          <p className="text-lg font-bold text-green-600">{formatRupiah(todayData.totalPaidToday)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingDown className="w-4 h-4 text-red-600" />
+            <span className="text-xs text-muted-foreground">Pengeluaran</span>
+          </div>
+          <p className="text-lg font-bold text-red-600">{formatRupiah(todayData.totalExpenses)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card border-2 border-primary">
+          <div className="flex items-center gap-2 mb-2">
+            <Receipt className="w-4 h-4 text-primary" />
+            <span className="text-xs text-muted-foreground">Kas Seharusnya</span>
+          </div>
+          <p className="text-lg font-bold text-primary">{formatRupiah(todayData.expectedCash)}</p>
+        </div>
+
+        <div className="bg-card rounded-xl p-4 shadow-card">
+          <div className="flex items-center gap-2 mb-2">
+            <Users className="w-4 h-4 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Jumlah Transaksi</span>
+          </div>
+          <p className="text-lg font-bold text-foreground">{todayData.transactionCount}</p>
+        </div>
+      </div>
+
+      {/* Transaction History */}
+      <div className="bg-card rounded-xl shadow-card overflow-hidden">
+        <div className="p-6 border-b border-border">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-foreground flex items-center gap-2">
+              <Receipt className="w-5 h-5 text-primary" />
+              Riwayat Transaksi
+            </h3>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setShowDetails(!showDetails)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-sm"
+              >
+                {showDetails ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showDetails ? 'Sederhana' : 'Detail'}
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input 
+              value={searchQuery} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              placeholder="Cari transaksi..." 
+              className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" 
+            />
+          </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waktu</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pelanggan</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item</th>
+                {showDetails && (
+                  <>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pembayaran</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filteredTransactions.map(tx => (
+                <tr key={tx.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{tx.id.slice(-6).toUpperCase()}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{formatDateTime(tx.date)}</td>
+                  <td className="px-4 py-3 text-sm text-foreground">{tx.customerName || 'Umum'}</td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground">
+                    {showDetails ? (
+                      <div className="space-y-1">
+                        {tx.items.map((item, idx) => (
+                          <div key={idx} className="text-xs">
+                            {item.productName} x{item.qty}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs">{tx.items.length} item</span>
+                    )}
+                  </td>
+                  {showDetails && (
+                    <>
+                      <td className="px-4 py-3 text-sm font-bold text-foreground">{formatRupiah(tx.grandTotal)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          tx.paymentType === 'cash' ? 'bg-green-100 text-green-800' :
+                          tx.paymentType === 'transfer' ? 'bg-blue-100 text-blue-800' :
+                          'bg-purple-100 text-purple-800'
+                        }`}>
+                          {tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
+                        </span>
+                      </td>
+                    </>
+                  )}
+                </tr>
+              ))}
+              {filteredTransactions.length === 0 && (
+                <tr>
+                  <td colSpan={showDetails ? 6 : 4} className="px-4 py-8 text-center text-muted-foreground">
+                    Belum ada transaksi hari ini
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
