@@ -41,7 +41,20 @@ export default function CashIn() {
           </div>
         </div>
         <div className="p-6 text-center text-muted-foreground">
-          <p className="text-sm">Buka sesi kasir terlebih dahulu untuk menggunakan fitur kas masuk</p>
+          <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+            <DollarSign className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <p className="text-sm font-medium mb-2">Sesi Kasir Belum Dibuka</p>
+          <p className="text-xs mb-4">Buka sesi kasir di Dashboard terlebih dahulu untuk menggunakan fitur kas masuk</p>
+          <div className="bg-muted/50 rounded-lg p-3 text-left max-w-sm mx-auto">
+            <p className="text-xs font-medium text-foreground mb-1">📋 Cara Membuka Sesi:</p>
+            <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+              <li>Pergi ke Dashboard</li>
+              <li>Masukkan modal awal (minimal 1)</li>
+              <li>Klik tombol "Buka Kasir"</li>
+              <li>Kembali ke menu "Kas Masuk"</li>
+            </ol>
+          </div>
         </div>
       </div>
     );
