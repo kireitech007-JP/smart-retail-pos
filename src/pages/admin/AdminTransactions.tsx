@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, formatDateTime } from '@/lib/format';
-import { Receipt } from 'lucide-react';
+import { Receipt, Printer, MessageSquare, Download } from 'lucide-react';
 import ExportButtons from '@/components/ExportButtons';
 import PrintButtons from '@/components/PrintButtons';
 
@@ -11,6 +11,185 @@ export default function AdminTransactions() {
 
   const filtered = selectedUnit === 'all' ? transactions : transactions.filter(t => t.unitId === selectedUnit);
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const handlePrintInvoice = (transaction: any) => {
+    const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
+    if (!printWindow) return;
+    
+    const htmlContent = generateInvoiceHTML(transaction);
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
+  const handleWhatsApp = (transaction: any) => {
+    const message = `*INVOICE SMART RETAIL POS*\n\n` +
+      `No: ${transaction.id.slice(-6).toUpperCase()}\n` +
+      `Tanggal: ${formatDateTime(transaction.date)}\n` +
+      `Pelanggan: ${transaction.customerName || 'Umum'}\n` +
+      `Total: ${formatRupiah(transaction.grandTotal)}\n` +
+      `Pembayaran: ${transaction.paymentType === 'cash' ? 'Tunai' : transaction.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}\n\n` +
+      `Terima kasih atas pembelian Anda!`;
+    
+    const phoneNumber = transaction.customerPhone || '';
+    if (phoneNumber) {
+      window.open(`https://wa.me/${phoneNumber.replace(/[^\d]/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+    } else {
+      // Copy to clipboard if no phone number
+      navigator.clipboard.writeText(message);
+      alert('Pesan WhatsApp disalin ke clipboard. Nomor telepon pelanggan tidak tersedia.');
+    }
+  };
+
+  const generateInvoiceHTML = (tx: any) => {
+    return `
+      <html>
+        <head>
+          <title>Invoice - ${tx.id.slice(-6).toUpperCase()}</title>
+          <style>
+            @page { 
+              margin: 10px; 
+              size: 80mm auto;
+            }
+            body { 
+              font-family: 'Courier New', monospace; 
+              font-size: 12px;
+              margin: 0; 
+              padding: 10px;
+              line-height: 1.2;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 15px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 10px;
+            }
+            .title { 
+              font-size: 16px; 
+              font-weight: bold; 
+              margin: 5px 0;
+            }
+            .subtitle { 
+              font-size: 11px; 
+              margin: 2px 0;
+            }
+            .info { 
+              margin: 10px 0;
+              font-size: 11px;
+            }
+            .info-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 3px 0;
+            }
+            .items { 
+              margin: 15px 0;
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+              padding: 10px 0;
+            }
+            .item-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 5px 0;
+              font-size: 11px;
+            }
+            .total { 
+              margin-top: 15px;
+              border-top: 1px solid #000;
+              padding-top: 10px;
+            }
+            .total-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: 5px 0;
+              font-weight: bold;
+            }
+            .payment { 
+              margin-top: 10px;
+              padding: 10px;
+              background: #f5f5f5;
+            }
+            .footer { 
+              margin-top: 20px;
+              text-align: center;
+              border-top: 1px dashed #000;
+              padding-top: 10px;
+              font-size: 10px;
+            }
+            @media print {
+              body { margin: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">SMART RETAIL POS</div>
+            <div class="subtitle">Jl. Contoh No. 123, Jakarta</div>
+            <div class="subtitle">Telp: (021) 1234-5678</div>
+          </div>
+          
+          <div class="info">
+            <div class="info-row">
+              <span>INVOICE</span>
+              <span>${tx.id.slice(-6).toUpperCase()}</span>
+            </div>
+            <div class="info-row">
+              <span>Tanggal</span>
+              <span>${formatDateTime(tx.date)}</span>
+            </div>
+            <div class="info-row">
+              <span>Kasir</span>
+              <span>${tx.cashierName}</span>
+            </div>
+            <div class="info-row">
+              <span>Pelanggan</span>
+              <span>${tx.customerName || 'Umum'}</span>
+            </div>
+          </div>
+          
+          <div class="items">
+            ${tx.items.map(item => `
+              <div class="item-row">
+                <span>${item.productName} x${item.qty}</span>
+                <span>${formatRupiah(item.price)}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <div class="total">
+            <div class="total-row">
+              <span>Subtotal</span>
+              <span>${formatRupiah(tx.total)}</span>
+            </div>
+            ${tx.discount > 0 ? `
+              <div class="total-row">
+                <span>Discount</span>
+                <span>-${formatRupiah(tx.discount)}</span>
+              </div>
+            ` : ''}
+            <div class="total-row" style="font-size: 14px; border-top: 2px solid #000; padding-top: 5px;">
+              <span>TOTAL</span>
+              <span>${formatRupiah(tx.grandTotal)}</span>
+            </div>
+          </div>
+          
+          <div class="payment">
+            <div class="info-row">
+              <span>Payment</span>
+              <span>${tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}</span>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <div>Terima Kasih</div>
+            <div>Selamat Berbelanja Kembali</div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
 
   const exportData = sorted.map(t => ({
     'ID Transaksi': t.id,
@@ -53,7 +232,7 @@ export default function AdminTransactions() {
           <table className="w-full">
             <thead>
               <tr className="bg-muted/50">
-                {['ID', 'Tanggal', 'Pelanggan', 'Unit', 'Kasir', 'Item', 'Total', 'Diskon', 'Grand Total', 'Pembayaran'].map(h => (
+                {['ID', 'Tanggal', 'Pelanggan', 'Unit', 'Kasir', 'Item', 'Total', 'Diskon', 'Grand Total', 'Pembayaran', 'Aksi'].map(h => (
                   <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -76,10 +255,28 @@ export default function AdminTransactions() {
                       {tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handlePrintInvoice(tx)}
+                        className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors"
+                        title="Cetak Invoice"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleWhatsApp(tx)}
+                        className="p-1.5 rounded-lg bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+                        title="Kirim WhatsApp"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {sorted.length === 0 && (
-                <tr><td colSpan={10} className="px-4 py-12 text-center text-muted-foreground">Belum ada transaksi</td></tr>
+                <tr><td colSpan={11} className="px-4 py-12 text-center text-muted-foreground">Belum ada transaksi</td></tr>
               )}
             </tbody>
           </table>
