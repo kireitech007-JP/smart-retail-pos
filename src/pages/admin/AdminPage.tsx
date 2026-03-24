@@ -7,7 +7,7 @@ import AdminTransactions from './AdminTransactions';
 import AdminDebts from './AdminDebts';
 import AdminCashIn from './AdminCashIn';
 import AdminReports from './AdminReports';
-import AdminSettings from './AdminSettings';
+import Settings from './Settings';
 
 export default function AdminPage() {
   return (
@@ -21,7 +21,7 @@ export default function AdminPage() {
           case 'debts': return <AdminDebts />;
           case 'cashin': return <AdminCashIn />;
           case 'reports': return <AdminReports />;
-          case 'settings': return <AdminSettings />;
+          case 'settings': return <Settings />;
           default: return <AdminDashboard />;
         }
       }}
