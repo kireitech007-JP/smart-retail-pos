@@ -9,6 +9,8 @@ import {
 import { toast } from 'sonner';
 import CashIn from '@/components/CashIn';
 import CashierDashboard from '@/components/CashierDashboard';
+import ExportButtons from '@/components/ExportButtons';
+import PrintButtons from '@/components/PrintButtons';
 
 export default function CashierPOS() {
   const { 
@@ -170,6 +172,65 @@ export default function CashierPOS() {
   const sessionSales = sessionTx.reduce((s, t) => s + t.grandTotal, 0);
   const sessionExpTotal = sessionExp.reduce((s, e) => s + e.amount, 0);
   const sessionCashInTotal = sessionCashIn.reduce((s, c) => s + c.amount, 0);
+
+  // Prepare export data for cashier session report
+  const sessionReportData = useMemo(() => {
+    if (!activeSession) return [];
+    
+    const reportData = [
+      {
+        'Tanggal': formatDateTime(new Date().toISOString()),
+        'Kasir': currentUser?.name || '',
+        'Unit': units.find(u => u.id === activeSession.unitId)?.name || '',
+        'Sesi ID': activeSession.id.slice(-6).toUpperCase(),
+        'Waktu Buka': formatDateTime(activeSession.startTime),
+        'Modal Awal': activeSession.openingCash,
+        'Total Penjualan': sessionSales,
+        'Total Kas Masuk': sessionCashInTotal,
+        'Total Pengeluaran': sessionExpTotal,
+        'Saldo Akhir': activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
+        'Jumlah Transaksi': sessionTx.length
+      }
+    ];
+
+    // Add transaction details
+    sessionTx.forEach(tx => {
+      reportData.push({
+        'Tanggal': formatDateTime(tx.date),
+        'Tipe': 'Transaksi',
+        'ID': tx.id.slice(-6).toUpperCase(),
+        'Pelanggan': tx.customerName || 'Umum',
+        'Pembayaran': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
+        'Total': tx.grandTotal,
+        'Item': tx.items.map(item => `${item.productName} x${item.qty}`).join(', ')
+      });
+    });
+
+    // Add cash in details
+    sessionCashIn.forEach(ci => {
+      reportData.push({
+        'Tanggal': formatDateTime(ci.date),
+        'Tipe': 'Kas Masuk',
+        'ID': ci.id.slice(-6).toUpperCase(),
+        'Penyetor': ci.depositorName,
+        'Keterangan': ci.description,
+        'Jumlah': ci.amount
+      });
+    });
+
+    // Add expense details
+    sessionExp.forEach(exp => {
+      reportData.push({
+        'Tanggal': formatDateTime(exp.date),
+        'Tipe': 'Pengeluaran',
+        'ID': exp.id.slice(-6).toUpperCase(),
+        'Keterangan': exp.description,
+        'Jumlah': -exp.amount
+      });
+    });
+
+    return reportData;
+  }, [activeSession, sessionTx, sessionExp, sessionCashIn, sessionSales, sessionExpTotal, sessionCashInTotal, currentUser, units]);
 
   if (!activeSession && !['dashboard', 'cashin'].includes(activePage)) {
     return (
@@ -572,18 +633,24 @@ export default function CashierPOS() {
               <p className="text-center text-xs text-muted-foreground mt-4">Terima kasih atas kunjungan Anda!</p>
             </div>
 
-            <div className="p-4 border-t border-border grid grid-cols-2 gap-2">
-              <button onClick={handlePrint} className="flex items-center justify-center gap-2 py-2.5 bg-primary/10 text-primary rounded-lg text-sm font-medium hover:bg-primary/20">
-                <Printer className="w-4 h-4" /> Cetak
-              </button>
-              <button onClick={handleDownloadInvoice} className="flex items-center justify-center gap-2 py-2.5 bg-info/10 text-info rounded-lg text-sm font-medium hover:bg-info/20">
-                <Download className="w-4 h-4" /> Download
-              </button>
-              {showInvoice.customerPhone && (
-                <button onClick={handleWhatsApp} className="col-span-2 flex items-center justify-center gap-2 py-2.5 bg-success/10 text-success rounded-lg text-sm font-medium hover:bg-success/20">
-                  <MessageSquare className="w-4 h-4" /> Kirim WhatsApp
+            <div className="p-4 border-t border-border">
+              <div className="mb-3">
+                <p className="text-xs font-medium text-foreground mb-2">Opsi Cetak:</p>
+                <PrintButtons 
+                  transaction={showInvoice} 
+                  type={invoiceType as 'invoice' | 'faktur'}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={handleDownloadInvoice} className="flex items-center justify-center gap-2 py-2.5 bg-info/10 text-info rounded-lg text-sm font-medium hover:bg-info/20">
+                  <Download className="w-4 h-4" /> Download
                 </button>
-              )}
+                {showInvoice.customerPhone && (
+                  <button onClick={handleWhatsApp} className="flex items-center justify-center gap-2 py-2.5 bg-success/10 text-success rounded-lg text-sm font-medium hover:bg-success/20">
+                    <MessageSquare className="w-4 h-4" /> WhatsApp
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -608,6 +675,171 @@ export default function CashierPOS() {
                 </div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Jumlah Transaksi</span><span className="text-foreground">{sessionTx.length}</span></div>
               </div>
+              
+              {/* Detailed Payment Report */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <p className="text-sm font-medium text-foreground mb-3">Laporan Pembayaran Terperinci</p>
+                <div className="space-y-3 max-h-60 overflow-y-auto">
+                  {/* Sales Transactions */}
+                  {sessionTx.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">💰 Penjualan ({sessionTx.length})</p>
+                      <div className="space-y-1">
+                        {sessionTx.map(tx => (
+                          <div key={tx.id} className="bg-background rounded p-2 text-xs">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1">
+                                <p className="font-medium text-foreground">{tx.customerName || 'Umum'}</p>
+                                <p className="text-muted-foreground">
+                                  {tx.items.slice(0, 2).map(item => `${item.productName} x${item.qty}`).join(', ')}
+                                  {tx.items.length > 2 && ` +${tx.items.length - 2} lainnya`}
+                                </p>
+                              </div>
+                              <div className="text-right ml-2">
+                                <p className="font-bold text-foreground">{formatRupiah(tx.grandTotal)}</p>
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  tx.paymentType === 'cash' ? 'bg-green-100 text-green-700' :
+                                  tx.paymentType === 'transfer' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-purple-100 text-purple-700'
+                                }`}>
+                                  {tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
+                                </span>
+                              </div>
+                            </div>
+                            {tx.paymentType === 'credit' && (
+                              <div className="mt-1 pt-1 border-t border-border/50">
+                                <p className="text-muted-foreground">
+                                  DP: {formatRupiah(tx.dp || 0)} | Sisa: {formatRupiah(tx.grandTotal - (tx.dp || 0))}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Cash In Transactions */}
+                  {sessionCashIn.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">💵 Kas Masuk ({sessionCashIn.length})</p>
+                      <div className="space-y-1">
+                        {sessionCashIn.map(ci => (
+                          <div key={ci.id} className="bg-background rounded p-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="font-medium text-foreground">{ci.depositorName}</p>
+                                <p className="text-muted-foreground">{ci.description}</p>
+                              </div>
+                              <p className="font-bold text-green-600">{formatRupiah(ci.amount)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Expense Transactions */}
+                  {sessionExp.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground mb-2">💸 Pengeluaran ({sessionExp.length})</p>
+                      <div className="space-y-1">
+                        {sessionExp.map(exp => (
+                          <div key={exp.id} className="bg-background rounded p-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <p className="text-muted-foreground">{exp.description}</p>
+                              <p className="font-bold text-red-600">{formatRupiah(exp.amount)}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Debt Payments */}
+                  {(() => {
+                    const debtPayments = debts
+                      .filter(d => d.unitId === activeSession.unitId)
+                      .flatMap(d => 
+                        (d.payments || [])
+                          .filter(p => new Date(p.date) >= new Date(activeSession.startTime) && 
+                                       (!activeSession.endTime || new Date(p.date) <= new Date(activeSession.endTime)))
+                          .map(p => ({
+                            ...p,
+                            customerName: d.customerName,
+                            debtId: d.id
+                          }))
+                      );
+                    
+                    return debtPayments.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground mb-2">📋 Pelunasan Piutang ({debtPayments.length})</p>
+                        <div className="space-y-1">
+                          {debtPayments.map((payment, idx) => (
+                            <div key={`${payment.debtId}-${idx}`} className="bg-background rounded p-2 text-xs">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium text-foreground">{payment.customerName}</p>
+                                  <p className="text-muted-foreground">{formatDateTime(payment.date)}</p>
+                                </div>
+                                <p className="font-bold text-indigo-600">{formatRupiah(payment.amount)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  
+                  {/* Empty State */}
+                  {sessionTx.length === 0 && sessionCashIn.length === 0 && sessionExp.length === 0 && (() => {
+                    const debtPayments = debts
+                      .filter(d => d.unitId === activeSession.unitId)
+                      .flatMap(d => (d.payments || [])
+                        .filter(p => new Date(p.date) >= new Date(activeSession.startTime) && 
+                                       (!activeSession.endTime || new Date(p.date) <= new Date(activeSession.endTime))));
+                    return debtPayments.length === 0;
+                  })() && (
+                    <div className="text-center text-muted-foreground py-4">
+                      <p className="text-sm">Belum ada transaksi dalam sesi ini</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Export Buttons */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <p className="text-sm font-medium text-foreground mb-3">Export Laporan Sesi</p>
+                <ExportButtons 
+                  data={sessionReportData} 
+                  filename={`laporan-kasir-${activeSession.id.slice(-6).toUpperCase()}`} 
+                  title={`Laporan Kasir ${currentUser?.name} - ${formatDateTime(new Date().toISOString())}`}
+                />
+              </div>
+              
+              {/* Print Session Report */}
+              <div className="bg-muted/30 rounded-lg p-4">
+                <p className="text-sm font-medium text-foreground mb-3">Cetak Laporan Sesi</p>
+                <PrintButtons 
+                  sessionData={{
+                    cashierName: currentUser?.name,
+                    unitName: units.find(u => u.id === activeSession.unitId)?.name,
+                    sessionId: activeSession.id.slice(-6).toUpperCase(),
+                    openTime: formatDateTime(activeSession.startTime),
+                    openingCash: activeSession.openingCash,
+                    totalSales: sessionSales,
+                    totalCashIn: sessionCashInTotal,
+                    totalExpenses: sessionExpTotal,
+                    totalPaidToday: sessionReportData
+                      .filter(row => row['Tipe'] === 'Pelunasan Piutang')
+                      .reduce((sum, row) => sum + (row['Jumlah'] || 0), 0),
+                    finalBalance: activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
+                    transactionCount: sessionTx.length
+                  }}
+                  type="session"
+                />
+              </div>
+              
               <div className="flex gap-2">
                 <button onClick={() => setShowCashierClose(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium">Batal</button>
                 <button onClick={handleCloseSession} className="flex-1 py-3 bg-destructive text-destructive-foreground rounded-lg font-medium">Tutup Kasir</button>

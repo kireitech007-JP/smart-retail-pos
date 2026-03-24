@@ -37,14 +37,17 @@ export default function CashierDashboard() {
       activeSession.cashIns?.includes(c.id)
     ) : cashIns.filter(c => isToday(c.date) && c.unitId === userUnit?.id);
 
+    // Group transactions by payment type
     const cashTransactions = sessionTx.filter(t => t.paymentType === 'cash');
     const transferTransactions = sessionTx.filter(t => t.paymentType === 'transfer');
     const creditTransactions = sessionTx.filter(t => t.paymentType === 'credit');
-    
-    const creditDP = creditTransactions.reduce((sum, t) => sum + (t.dp || 0), 0);
-    const creditFull = creditTransactions.filter(t => !t.dp || t.dp === t.grandTotal).reduce((sum, t) => sum + t.grandTotal, 0);
-    const creditInstallment = creditDP > 0 ? creditDP : creditTransactions.reduce((sum, t) => sum + t.grandTotal, 0) - creditFull;
 
+    // Group credit transactions by type
+    const creditDP = creditTransactions.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.dp || 0), 0);
+    const creditFull = creditTransactions.filter(t => !t.dp || t.dp === t.grandTotal).reduce((sum, t) => sum + t.grandTotal, 0);
+    const creditInstallment = creditTransactions.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.grandTotal - (t.dp || 0)), 0);
+
+    // Get debt payments today
     const paidDebts = debts.filter(d => 
       d.unitId === userUnit?.id && 
       d.payments?.some(p => isToday(p.date))
@@ -62,6 +65,52 @@ export default function CashierDashboard() {
 
     const expectedCash = (activeSession?.openingCash || openingCash) + totalCash + totalCashIn + totalPaidToday - totalExpenses;
 
+    // Create comprehensive transaction history
+    const allTransactions = [
+      // POS Transactions
+      ...sessionTx.map(t => ({
+        id: t.id,
+        date: t.date,
+        type: 'transaction' as const,
+        description: `Penjualan ${t.paymentType === 'cash' ? 'Tunai' : t.paymentType === 'transfer' ? 'Transfer' : 'Kredit'} - ${t.customerName}`,
+        amount: t.grandTotal,
+        customerName: t.customerName,
+        paymentType: t.paymentType,
+        items: t.items.length
+      })),
+      // Cash In transactions
+      ...sessionCashIn.map(c => ({
+        id: c.id,
+        date: c.date,
+        type: 'cashin' as const,
+        description: `Kas Masuk - ${c.depositorName}`,
+        amount: c.amount,
+        depositorName: c.depositorName,
+        details: c.description
+      })),
+      // Expense transactions
+      ...sessionExp.map(e => ({
+        id: e.id,
+        date: e.date,
+        type: 'expense' as const,
+        description: `Pengeluaran - ${e.description}`,
+        amount: -e.amount, // Negative for expenses
+        details: e.description
+      })),
+      // Debt payments
+      ...paidDebts.flatMap(d => 
+        (d.payments?.filter(p => isToday(p.date)) || []).map(p => ({
+          id: `${d.id}-${p.date}`,
+          date: p.date,
+          type: 'debt_payment' as const,
+          description: `Pelunasan Piutang - ${d.customerName}`,
+          amount: p.amount,
+          customerName: d.customerName,
+          originalDebtId: d.id
+        }))
+      )
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
     return {
       openingCash: activeSession?.openingCash || openingCash,
       totalCash,
@@ -73,19 +122,22 @@ export default function CashierDashboard() {
       totalExpenses,
       expectedCash,
       transactionCount: sessionTx.length,
-      transactions: sessionTx
+      transactions: sessionTx,
+      allTransactions // New comprehensive list
     };
   }, [activeSession, transactions, expenses, cashIns, debts, userUnit, openingCash]);
 
   const filteredTransactions = useMemo(() => {
-    if (!searchQuery) return todayData.transactions;
+    if (!searchQuery) return todayData.allTransactions;
     const q = searchQuery.toLowerCase();
-    return todayData.transactions.filter(t => 
-      t.customerName?.toLowerCase().includes(q) ||
+    return todayData.allTransactions.filter(t => 
+      t.description?.toLowerCase().includes(q) ||
       t.id.toLowerCase().includes(q) ||
-      t.items.some(item => item.productName.toLowerCase().includes(q))
+      ('customerName' in t && t.customerName?.toLowerCase().includes(q)) ||
+      ('depositorName' in t && t.depositorName?.toLowerCase().includes(q)) ||
+      ('items' in t && t.items > 0) // For transactions with items
     );
-  }, [todayData.transactions, searchQuery]);
+  }, [todayData.allTransactions, searchQuery]);
 
   const handleOpenSession = () => {
     console.log('Opening session:', { currentUser, openingCash });
@@ -289,13 +341,10 @@ export default function CashierDashboard() {
               <tr className="bg-muted/50">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">ID</th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Waktu</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pelanggan</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Item</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Deskripsi</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Jenis</th>
                 {showDetails && (
-                  <>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Pembayaran</th>
-                  </>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Jumlah</th>
                 )}
               </tr>
             </thead>
@@ -304,39 +353,64 @@ export default function CashierDashboard() {
                 <tr key={tx.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{tx.id.slice(-6).toUpperCase()}</td>
                   <td className="px-4 py-3 text-sm text-foreground">{formatDateTime(tx.date)}</td>
-                  <td className="px-4 py-3 text-sm text-foreground">{tx.customerName || 'Umum'}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {showDetails ? (
-                      <div className="space-y-1">
-                        {tx.items.map((item, idx) => (
-                          <div key={idx} className="text-xs">
-                            {item.productName} x{item.qty}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs">{tx.items.length} item</span>
-                    )}
+                  <td className="px-4 py-3 text-sm text-foreground">
+                    <div>
+                      <p className="font-medium">{tx.description}</p>
+                      {showDetails && tx.type === 'transaction' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {('customerName' in tx && tx.customerName) || 'Umum'}
+                        </p>
+                      )}
+                      {showDetails && tx.type === 'cashin' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Penyetor: {('depositorName' in tx && tx.depositorName) || '-'}
+                        </p>
+                      )}
+                      {showDetails && tx.type === 'expense' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {('details' in tx && tx.details) || '-'}
+                        </p>
+                      )}
+                      {showDetails && tx.type === 'debt_payment' && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Pelanggan: {('customerName' in tx && tx.customerName) || '-'}
+                        </p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      tx.type === 'transaction' ? 
+                        (('paymentType' in tx && tx.paymentType) === 'cash' ? 'bg-green-100 text-green-800' :
+                         ('paymentType' in tx && tx.paymentType) === 'transfer' ? 'bg-blue-100 text-blue-800' :
+                         'bg-purple-100 text-purple-800') :
+                      tx.type === 'cashin' ? 'bg-emerald-100 text-emerald-800' :
+                      tx.type === 'expense' ? 'bg-red-100 text-red-800' :
+                      tx.type === 'debt_payment' ? 'bg-indigo-100 text-indigo-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {tx.type === 'transaction' ? 
+                        (('paymentType' in tx && tx.paymentType) === 'cash' ? 'Tunai' :
+                         ('paymentType' in tx && tx.paymentType) === 'transfer' ? 'Transfer' :
+                         'Kredit') :
+                      tx.type === 'cashin' ? 'Kas Masuk' :
+                      tx.type === 'expense' ? 'Pengeluaran' :
+                      tx.type === 'debt_payment' ? 'Lunas Piutang' :
+                      'Lainnya'}
+                    </span>
                   </td>
                   {showDetails && (
-                    <>
-                      <td className="px-4 py-3 text-sm font-bold text-foreground">{formatRupiah(tx.grandTotal)}</td>
-                      <td className="px-4 py-3 text-sm">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          tx.paymentType === 'cash' ? 'bg-green-100 text-green-800' :
-                          tx.paymentType === 'transfer' ? 'bg-blue-100 text-blue-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
-                          {tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
-                        </span>
-                      </td>
-                    </>
+                    <td className={`px-4 py-3 text-sm font-bold ${
+                      tx.amount < 0 ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {formatRupiah(Math.abs(tx.amount))}
+                    </td>
                   )}
                 </tr>
               ))}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={showDetails ? 6 : 4} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={showDetails ? 4 : 3} className="px-4 py-8 text-center text-muted-foreground">
                     Belum ada transaksi hari ini
                   </td>
                 </tr>

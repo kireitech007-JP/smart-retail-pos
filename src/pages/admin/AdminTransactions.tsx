@@ -3,6 +3,7 @@ import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, formatDateTime } from '@/lib/format';
 import { Receipt } from 'lucide-react';
 import ExportButtons from '@/components/ExportButtons';
+import PrintButtons from '@/components/PrintButtons';
 
 export default function AdminTransactions() {
   const { transactions, units } = useApp();
@@ -43,6 +44,7 @@ export default function AdminTransactions() {
           <Receipt className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-foreground">Riwayat Transaksi</h3>
           <div className="ml-auto flex items-center gap-2">
+            <PrintButtons transactions={sorted} type="faktur" />
             <ExportButtons data={exportData} filename="transaksi" title="Riwayat Transaksi" />
             <span className="text-sm text-muted-foreground">{sorted.length} transaksi</span>
           </div>
