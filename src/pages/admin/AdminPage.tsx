@@ -13,6 +13,7 @@ export default function AdminPage() {
   return (
     <AdminLayout>
       {(activePage: string) => {
+        console.log('AdminPage rendering activePage:', activePage);
         switch (activePage) {
           case 'dashboard': return <AdminDashboard />;
           case 'products': return <AdminProducts />;
@@ -21,7 +22,9 @@ export default function AdminPage() {
           case 'debts': return <AdminDebts />;
           case 'cashin': return <AdminCashIn />;
           case 'reports': return <AdminReports />;
-          case 'settings': return <Settings />;
+          case 'settings': 
+            console.log('Rendering Settings component');
+            return <Settings />;
           default: return <AdminDashboard />;
         }
       }}

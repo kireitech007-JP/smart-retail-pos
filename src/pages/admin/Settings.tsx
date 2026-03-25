@@ -11,6 +11,7 @@ interface SupabaseConfig {
 }
 
 export default function Settings() {
+  console.log('Settings component mounted');
   const { storeSettings, updateStoreSettings } = useApp();
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     url: '',

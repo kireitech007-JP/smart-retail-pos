@@ -49,7 +49,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
 
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {menuItems.map(item => (
-            <button key={item.id} onClick={() => { setActivePage(item.id); setMobileOpen(false); }}
+            <button key={item.id} onClick={() => { 
+              console.log('Settings button clicked:', item.id);
+              setActivePage(item.id); 
+              setMobileOpen(false); 
+            }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
                 ${activePage === item.id ? 'bg-sidebar-active text-primary-foreground' : 'text-sidebar-fg hover:bg-sidebar-hover'} 
                 ${collapsed ? 'justify-center' : ''}`}>
