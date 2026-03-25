@@ -1,0 +1,823 @@
+/**
+ * Google Apps Script untuk Backup & Restore Smart Retail POS
+ * Script ini melakukan backup lengkap semua data dari POS ke Google Sheets
+ * Termasuk: Produk, Kategori, Satuan, Pengguna, Transaksi, Piutang, Kas Masuk, Pengeluaran, Laporan
+ * 
+ * Cara Setup:
+ * 1. Buat Google Sheets baru dengan nama "Smart Retail POS Backup"
+ * 2. Copy script ini ke Apps Script Editor
+ * 3. Deploy sebagai Web App
+ * 4. Copy Web App URL dan masukkan ke pengaturan cloud di POS
+ */
+
+// Konfigurasi
+const CONFIG = {
+  // Sheet names
+  SHEETS: {
+    KATEGORI: 'Kategori',
+    SATUAN: 'Satuan', 
+    PRODUK: 'Produk',
+    PENGGUNA: 'Pengguna',
+    UNIT: 'Unit',
+    TRANSAKSI: 'Transaksi',
+    TRANSAKSI_ITEMS: 'Transaksi_Items',
+    PIUTANG: 'Piutang',
+    KAS_MASUK: 'Kas_Masuk',
+    PENGELUARAN: 'Pengeluaran',
+    LAPORAN: 'Laporan',
+    SESSIONS: 'Sessions',
+    BACKUP_LOG: 'Backup_Log'
+  },
+  
+  // Headers untuk setiap sheet
+  HEADERS: {
+    KATEGORI: ['id', 'nama', 'deskripsi', 'created_at', 'updated_at'],
+    SATUAN: ['id', 'nama', 'deskripsi', 'created_at', 'updated_at'],
+    PRODUK: ['id', 'nama', 'sku', 'kategori_id', 'satuan_id', 'harga', 'hpp', 'stok', 'min_stok', 'supplier', 'unit_id', 'created_at', 'updated_at'],
+    PENGGUNA: ['id', 'nama', 'email', 'password', 'role', 'unit_id', 'status', 'created_at', 'updated_at'],
+    UNIT: ['id', 'nama', 'alamat', 'telepon', 'created_at', 'updated_at'],
+    TRANSAKSI: ['id', 'tanggal', 'kasir_id', 'unit_id', 'customer_name', 'customer_phone', 'payment_type', 'subtotal', 'discount', 'grand_total', 'cash_paid', 'change', 'status', 'session_id', 'created_at'],
+    TRANSAKSI_ITEMS: ['id', 'transaction_id', 'product_id', 'product_name', 'qty', 'price', 'hpp', 'subtotal', 'created_at'],
+    PIUTANG: ['id', 'customer_name', 'customer_phone', 'total_amount', 'paid_amount', 'remaining_amount', 'unit_id', 'status', 'created_at', 'updated_at'],
+    KAS_MASUK: ['id', 'amount', 'depositor_name', 'description', 'unit_id', 'session_id', 'date', 'created_at'],
+    PENGELUARAN: ['id', 'amount', 'description', 'unit_id', 'session_id', 'date', 'created_at'],
+    LAPORAN: ['id', 'tanggal', 'tipe', 'kasir_id', 'unit_id', 'total', 'deskripsi', 'session_id', 'created_at'],
+    SESSIONS: ['id', 'cashier_id', 'unit_id', 'opening_cash', 'opening_time', 'closing_cash', 'closing_time', 'status', 'created_at'],
+    BACKUP_LOG: ['timestamp', 'action', 'table', 'records_count', 'status', 'message']
+  }
+};
+
+/**
+ * Fungsi utama untuk handle POST request dari POS
+ */
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    // Log semua request
+    logBackup(action, data, 'REQUEST', `Received ${action} request`);
+    
+    let result;
+    
+    switch (action) {
+      case 'backupAllData':
+        result = backupAllData(data.data);
+        break;
+      case 'restoreAllData':
+        result = restoreAllData();
+        break;
+      case 'backupKategori':
+        result = backupKategori(data.kategori);
+        break;
+      case 'backupSatuan':
+        result = backupSatuan(data.satuan);
+        break;
+      case 'backupProduk':
+        result = backupProduk(data.produk);
+        break;
+      case 'backupPengguna':
+        result = backupPengguna(data.pengguna);
+        break;
+      case 'backupUnit':
+        result = backupUnit(data.unit);
+        break;
+      case 'backupTransaksi':
+        result = backupTransaksi(data.transaksi);
+        break;
+      case 'backupTransaksiItems':
+        result = backupTransaksiItems(data.items);
+        break;
+      case 'backupPiutang':
+        result = backupPiutang(data.piutang);
+        break;
+      case 'backupKasMasuk':
+        result = backupKasMasuk(data.kasMasuk);
+        break;
+      case 'backupPengeluaran':
+        result = backupPengeluaran(data.pengeluaran);
+        break;
+      case 'backupLaporan':
+        result = backupLaporan(data.laporan);
+        break;
+      case 'backupSessions':
+        result = backupSessions(data.sessions);
+        break;
+      case 'getAllData':
+        result = getAllData();
+        break;
+      case 'getPengguna':
+        result = getPengguna();
+        break;
+      case 'getProduk':
+        result = getProduk();
+        break;
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+    
+    logBackup(action, data, 'SUCCESS', `Successfully processed ${action}`);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: true,
+      data: result,
+      message: `${action} completed successfully`
+    })).setMimeType(ContentService.MimeType.JSON);
+    
+  } catch (error) {
+    logBackup('ERROR', e.postData.contents, 'ERROR', error.message);
+    
+    return ContentService.createTextOutput(JSON.stringify({
+      success: false,
+      error: error.message,
+      message: 'Request failed'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Backup semua data dari POS
+ */
+function backupAllData(allData) {
+  const results = {};
+  
+  try {
+    // Backup semua tabel
+    if (allData.kategori) {
+      results.kategori = backupKategori(allData.kategori);
+    }
+    if (allData.satuan) {
+      results.satuan = backupSatuan(allData.satuan);
+    }
+    if (allData.produk) {
+      results.produk = backupProduk(allData.produk);
+    }
+    if (allData.pengguna) {
+      results.pengguna = backupPengguna(allData.pengguna);
+    }
+    if (allData.unit) {
+      results.unit = backupUnit(allData.unit);
+    }
+    if (allData.transaksi) {
+      results.transaksi = backupTransaksi(allData.transaksi);
+    }
+    if (allData.transaksiItems) {
+      results.transaksiItems = backupTransaksiItems(allData.transaksiItems);
+    }
+    if (allData.piutang) {
+      results.piutang = backupPiutang(allData.piutang);
+    }
+    if (allData.kasMasuk) {
+      results.kasMasuk = backupKasMasuk(allData.kasMasuk);
+    }
+    if (allData.pengeluaran) {
+      results.pengeluaran = backupPengeluaran(allData.pengeluaran);
+    }
+    if (allData.laporan) {
+      results.laporan = backupLaporan(allData.laporan);
+    }
+    if (allData.sessions) {
+      results.sessions = backupSessions(allData.sessions);
+    }
+    
+    return {
+      success: true,
+      results: results,
+      message: 'All data backed up successfully',
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    throw new Error(`Backup failed: ${error.message}`);
+  }
+}
+
+/**
+ * Restore semua data ke POS
+ */
+function restoreAllData() {
+  try {
+    const data = {};
+    
+    // Ambil semua data dari sheets
+    data.kategori = getKategori();
+    data.satuan = getSatuan();
+    data.produk = getProduk();
+    data.pengguna = getPengguna();
+    data.unit = getUnit();
+    data.transaksi = getTransaksi();
+    data.transaksiItems = getTransaksiItems();
+    data.piutang = getPiutang();
+    data.kasMasuk = getKasMasuk();
+    data.pengeluaran = getPengeluaran();
+    data.laporan = getLaporan();
+    data.sessions = getSessions();
+    
+    return {
+      success: true,
+      data: data,
+      message: 'All data retrieved successfully',
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error) {
+    throw new Error(`Restore failed: ${error.message}`);
+  }
+}
+
+/**
+ * Backup Kategori
+ */
+function backupKategori(kategori) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.KATEGORI, CONFIG.HEADERS.KATEGORI);
+  
+  // Clear existing data (kecuali header)
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.KATEGORI.length).clearContent();
+  }
+  
+  // Add new data
+  if (kategori && kategori.length > 0) {
+    const rows = kategori.map(item => [
+      item.id || generateId(),
+      item.nama || '',
+      item.deskripsi || '',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: kategori ? kategori.length : 0,
+    message: 'Kategori backed up successfully'
+  };
+}
+
+/**
+ * Backup Satuan
+ */
+function backupSatuan(satuan) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.SATUAN, CONFIG.HEADERS.SATUAN);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.SATUAN.length).clearContent();
+  }
+  
+  // Add new data
+  if (satuan && satuan.length > 0) {
+    const rows = satuan.map(item => [
+      item.id || generateId(),
+      item.nama || '',
+      item.deskripsi || '',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: satuan ? satuan.length : 0,
+    message: 'Satuan backed up successfully'
+  };
+}
+
+/**
+ * Backup Produk
+ */
+function backupProduk(produk) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.PRODUK, CONFIG.HEADERS.PRODUK);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.PRODUK.length).clearContent();
+  }
+  
+  // Add new data
+  if (produk && produk.length > 0) {
+    const rows = produk.map(item => [
+      item.id || generateId(),
+      item.nama || '',
+      item.sku || '',
+      item.kategori_id || '',
+      item.satuan_id || '',
+      item.harga || 0,
+      item.hpp || 0,
+      item.stok || 0,
+      item.min_stok || 0,
+      item.supplier || '',
+      item.unit_id || '',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: produk ? produk.length : 0,
+    message: 'Produk backed up successfully'
+  };
+}
+
+/**
+ * Backup Pengguna (termasuk password)
+ */
+function backupPengguna(pengguna) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.PENGGUNA, CONFIG.HEADERS.PENGGUNA);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.PENGGUNA.length).clearContent();
+  }
+  
+  // Add new data
+  if (pengguna && pengguna.length > 0) {
+    const rows = pengguna.map(item => [
+      item.id || generateId(),
+      item.nama || '',
+      item.email || '',
+      item.password || '', // Password disimpan untuk restore
+      item.role || '',
+      item.unit_id || '',
+      item.status || 'active',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: pengguna ? pengguna.length : 0,
+    message: 'Pengguna backed up successfully'
+  };
+}
+
+/**
+ * Backup Unit
+ */
+function backupUnit(unit) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.UNIT, CONFIG.HEADERS.UNIT);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.UNIT.length).clearContent();
+  }
+  
+  // Add new data
+  if (unit && unit.length > 0) {
+    const rows = unit.map(item => [
+      item.id || generateId(),
+      item.nama || '',
+      item.alamat || '',
+      item.telepon || '',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: unit ? unit.length : 0,
+    message: 'Unit backed up successfully'
+  };
+}
+
+/**
+ * Backup Transaksi
+ */
+function backupTransaksi(transaksi) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.TRANSAKSI, CONFIG.HEADERS.TRANSAKSI);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.TRANSAKSI.length).clearContent();
+  }
+  
+  // Add new data
+  if (transaksi && transaksi.length > 0) {
+    const rows = transaksi.map(item => [
+      item.id || generateId(),
+      item.tanggal || new Date().toISOString(),
+      item.kasir_id || '',
+      item.unit_id || '',
+      item.customer_name || '',
+      item.customer_phone || '',
+      item.payment_type || '',
+      item.subtotal || 0,
+      item.discount || 0,
+      item.grand_total || 0,
+      item.cash_paid || 0,
+      item.change || 0,
+      item.status || 'completed',
+      item.session_id || '',
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: transaksi ? transaksi.length : 0,
+    message: 'Transaksi backed up successfully'
+  };
+}
+
+/**
+ * Backup Transaksi Items
+ */
+function backupTransaksiItems(items) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.TRANSAKSI_ITEMS, CONFIG.HEADERS.TRANSAKSI_ITEMS);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.TRANSAKSI_ITEMS.length).clearContent();
+  }
+  
+  // Add new data
+  if (items && items.length > 0) {
+    const rows = items.map(item => [
+      item.id || generateId(),
+      item.transaction_id || '',
+      item.product_id || '',
+      item.product_name || '',
+      item.qty || 0,
+      item.price || 0,
+      item.hpp || 0,
+      item.subtotal || 0,
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: items ? items.length : 0,
+    message: 'Transaksi Items backed up successfully'
+  };
+}
+
+/**
+ * Backup Piutang
+ */
+function backupPiutang(piutang) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.PIUTANG, CONFIG.HEADERS.PIUTANG);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.PIUTANG.length).clearContent();
+  }
+  
+  // Add new data
+  if (piutang && piutang.length > 0) {
+    const rows = piutang.map(item => [
+      item.id || generateId(),
+      item.customer_name || '',
+      item.customer_phone || '',
+      item.total_amount || 0,
+      item.paid_amount || 0,
+      item.remaining_amount || 0,
+      item.unit_id || '',
+      item.status || 'unpaid',
+      item.created_at || new Date().toISOString(),
+      item.updated_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: piutang ? piutang.length : 0,
+    message: 'Piutang backed up successfully'
+  };
+}
+
+/**
+ * Backup Kas Masuk
+ */
+function backupKasMasuk(kasMasuk) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.KAS_MASUK, CONFIG.HEADERS.KAS_MASUK);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.KAS_MASUK.length).clearContent();
+  }
+  
+  // Add new data
+  if (kasMasuk && kasMasuk.length > 0) {
+    const rows = kasMasuk.map(item => [
+      item.id || generateId(),
+      item.amount || 0,
+      item.depositor_name || '',
+      item.description || '',
+      item.unit_id || '',
+      item.session_id || '',
+      item.date || new Date().toISOString(),
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: kasMasuk ? kasMasuk.length : 0,
+    message: 'Kas Masuk backed up successfully'
+  };
+}
+
+/**
+ * Backup Pengeluaran
+ */
+function backupPengeluaran(pengeluaran) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.PENGELUARAN, CONFIG.HEADERS.PENGELUARAN);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.PENGELUARAN.length).clearContent();
+  }
+  
+  // Add new data
+  if (pengeluaran && pengeluaran.length > 0) {
+    const rows = pengeluaran.map(item => [
+      item.id || generateId(),
+      item.amount || 0,
+      item.description || '',
+      item.unit_id || '',
+      item.session_id || '',
+      item.date || new Date().toISOString(),
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: pengeluaran ? pengeluaran.length : 0,
+    message: 'Pengeluaran backed up successfully'
+  };
+}
+
+/**
+ * Backup Laporan
+ */
+function backupLaporan(laporan) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.LAPORAN, CONFIG.HEADERS.LAPORAN);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.LAPORAN.length).clearContent();
+  }
+  
+  // Add new data
+  if (laporan && laporan.length > 0) {
+    const rows = laporan.map(item => [
+      item.id || generateId(),
+      item.tanggal || new Date().toISOString(),
+      item.tipe || '',
+      item.kasir_id || '',
+      item.unit_id || '',
+      item.total || 0,
+      item.deskripsi || '',
+      item.session_id || '',
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: laporan ? laporan.length : 0,
+    message: 'Laporan backed up successfully'
+  };
+}
+
+/**
+ * Backup Sessions
+ */
+function backupSessions(sessions) {
+  const sheet = getOrCreateSheet(CONFIG.SHEETS.SESSIONS, CONFIG.HEADERS.SESSIONS);
+  
+  // Clear existing data
+  const lastRow = sheet.getLastRow();
+  if (lastRow > 1) {
+    sheet.getRange(2, 1, lastRow - 1, CONFIG.HEADERS.SESSIONS.length).clearContent();
+  }
+  
+  // Add new data
+  if (sessions && sessions.length > 0) {
+    const rows = sessions.map(item => [
+      item.id || generateId(),
+      item.cashier_id || '',
+      item.unit_id || '',
+      item.opening_cash || 0,
+      item.opening_time || new Date().toISOString(),
+      item.closing_cash || 0,
+      item.closing_time || '',
+      item.status || 'open',
+      item.created_at || new Date().toISOString()
+    ]);
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+  }
+  
+  return {
+    count: sessions ? sessions.length : 0,
+    message: 'Sessions backed up successfully'
+  };
+}
+
+/**
+ * Get functions untuk restore
+ */
+function getKategori() {
+  return getSheetData(CONFIG.SHEETS.KATEGORI, CONFIG.HEADERS.KATEGORI);
+}
+
+function getSatuan() {
+  return getSheetData(CONFIG.SHEETS.SATUAN, CONFIG.HEADERS.SATUAN);
+}
+
+function getProduk() {
+  return getSheetData(CONFIG.SHEETS.PRODUK, CONFIG.HEADERS.PRODUK);
+}
+
+function getPengguna() {
+  return getSheetData(CONFIG.SHEETS.PENGGUNA, CONFIG.HEADERS.PENGGUNA);
+}
+
+function getUnit() {
+  return getSheetData(CONFIG.SHEETS.UNIT, CONFIG.HEADERS.UNIT);
+}
+
+function getTransaksi() {
+  return getSheetData(CONFIG.SHEETS.TRANSAKSI, CONFIG.HEADERS.TRANSAKSI);
+}
+
+function getTransaksiItems() {
+  return getSheetData(CONFIG.SHEETS.TRANSAKSI_ITEMS, CONFIG.HEADERS.TRANSAKSI_ITEMS);
+}
+
+function getPiutang() {
+  return getSheetData(CONFIG.SHEETS.PIUTANG, CONFIG.HEADERS.PIUTANG);
+}
+
+function getKasMasuk() {
+  return getSheetData(CONFIG.SHEETS.KAS_MASUK, CONFIG.HEADERS.KAS_MASUK);
+}
+
+function getPengeluaran() {
+  return getSheetData(CONFIG.SHEETS.PENGELUARAN, CONFIG.HEADERS.PENGELUARAN);
+}
+
+function getLaporan() {
+  return getSheetData(CONFIG.SHEETS.LAPORAN, CONFIG.HEADERS.LAPORAN);
+}
+
+function getSessions() {
+  return getSheetData(CONFIG.SHEETS.SESSIONS, CONFIG.HEADERS.SESSIONS);
+}
+
+function getAllData() {
+  return {
+    kategori: getKategori(),
+    satuan: getSatuan(),
+    produk: getProduk(),
+    pengguna: getPengguna(),
+    unit: getUnit(),
+    transaksi: getTransaksi(),
+    transaksiItems: getTransaksiItems(),
+    piutang: getPiutang(),
+    kasMasuk: getKasMasuk(),
+    pengeluaran: getPengeluaran(),
+    laporan: getLaporan(),
+    sessions: getSessions()
+  };
+}
+
+/**
+ * Helper functions
+ */
+function getOrCreateSheet(sheetName, headers) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+    sheet.autoResizeColumns();
+  }
+  
+  return sheet;
+}
+
+function getSheetData(sheetName, headers) {
+  const sheet = getSheet(sheetName);
+  if (!sheet || sheet.getLastRow() <= 1) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  const rows = data.slice(1); // Skip header
+  
+  return rows.map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = row[index];
+    });
+    return obj;
+  });
+}
+
+function getSheet(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  return ss.getSheetByName(sheetName);
+}
+
+function generateId() {
+  return 'POS_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function logBackup(action, data, status, message) {
+  try {
+    const sheet = getOrCreateSheet(CONFIG.SHEETS.BACKUP_LOG, CONFIG.HEADERS.BACKUP_LOG);
+    sheet.appendRow([
+      new Date().toISOString(),
+      action,
+      JSON.stringify(data),
+      status,
+      message
+    ]);
+  } catch (error) {
+    // Ignore log errors to prevent infinite loops
+  }
+}
+
+/**
+ * Setup function - jalankan sekali untuk inisialisasi
+ */
+function setupBackupSheets() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // Buat semua sheets
+  Object.keys(CONFIG.SHEETS).forEach(key => {
+    const sheetName = CONFIG.SHEETS[key];
+    const headers = CONFIG.HEADERS[sheetName];
+    
+    if (!ss.getSheetByName(sheetName)) {
+      const sheet = ss.insertSheet(sheetName);
+      sheet.appendRow(headers);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.autoResizeColumns();
+    }
+  });
+  
+  // Hide backup log sheet
+  const logSheet = ss.getSheetByName(CONFIG.SHEETS.BACKUP_LOG);
+  if (logSheet) {
+    logSheet.hideSheet();
+  }
+  
+  return 'Backup sheets setup completed successfully!';
+}
+
+/**
+ * Test function
+ */
+function testBackupConnection() {
+  return {
+    success: true,
+    message: 'Google Apps Script Backup connection successful',
+    timestamp: new Date().toISOString(),
+    spreadsheet: SpreadsheetApp.getActiveSpreadsheet().getName(),
+    availableSheets: Object.values(CONFIG.SHEETS)
+  };
+}
+
+/**
+ * Clear all data (for testing)
+ */
+function clearAllData() {
+  Object.values(CONFIG.SHEETS).forEach(sheetName => {
+    const sheet = getSheet(sheetName);
+    if (sheet && sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+    }
+  });
+  
+  return 'All data cleared successfully!';
+}
