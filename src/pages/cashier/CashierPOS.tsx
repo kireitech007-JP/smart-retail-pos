@@ -61,6 +61,13 @@ export default function CashierPOS() {
     supplier: ''
   });
 
+  // Add stock state for existing products
+  const [addStockProduct, setAddStockProduct] = useState({
+    productId: '',
+    additionalStock: 0,
+    notes: ''
+  });
+
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
 
@@ -115,56 +122,41 @@ export default function CashierPOS() {
   };
 
   const handleAddProduct = () => {
-    if (!newProduct.name.trim()) {
-      toast.error('Nama produk harus diisi!');
+    if (!addStockProduct.productId) {
+      toast.error('Pilih produk terlebih dahulu!');
       return;
     }
-    if (newProduct.price <= 0) {
-      toast.error('Harga harus lebih dari 0!');
-      return;
-    }
-    if (newProduct.stock < 0) {
-      toast.error('Stok tidak boleh negatif!');
+    if (addStockProduct.additionalStock <= 0) {
+      toast.error('Jumlah stok harus lebih dari 0!');
       return;
     }
 
-    // Generate random ID for new product
-    const productId = 'prod_' + Date.now();
+    // Find the selected product
+    const selectedProduct = products.find(p => p.id === addStockProduct.productId);
+    if (!selectedProduct) {
+      toast.error('Produk tidak ditemukan!');
+      return;
+    }
+
+    // Update stock (in real implementation, this would update via context/API)
+    const updatedStock = selectedProduct.stock + addStockProduct.additionalStock;
     
-    // Add to products (this would normally be handled by the context)
-    const product = {
-      id: productId,
-      name: newProduct.name,
-      sku: newProduct.sku || productId,
-      price: newProduct.price,
-      hpp: newProduct.hpp,
-      stock: newProduct.stock,
-      minStock: newProduct.minStock,
-      categoryId: newProduct.categoryId,
-      unitId: currentUser?.unitId || newProduct.unitId,
-      supplier: newProduct.supplier,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    console.log('Stock updated for product:', selectedProduct.name, {
+      oldStock: selectedProduct.stock,
+      additionalStock: addStockProduct.additionalStock,
+      newStock: updatedStock,
+      notes: addStockProduct.notes
+    });
 
     // Reset form
-    setNewProduct({
-      name: '',
-      sku: '',
-      price: 0,
-      hpp: 0,
-      stock: 0,
-      minStock: 0,
-      categoryId: '',
-      unitId: '',
-      supplier: ''
+    setAddStockProduct({
+      productId: '',
+      additionalStock: 0,
+      notes: ''
     });
     
     setShowAddProduct(false);
-    toast.success('Produk berhasil ditambahkan!');
-    
-    // Log the product (in real implementation, this would save to context/API)
-    console.log('New product added:', product);
+    toast.success(`Stok ${selectedProduct.name} berhasil ditambahkan!`);
   };
 
   const handlePayment = () => {
@@ -365,6 +357,17 @@ export default function CashierPOS() {
         </div>
       </header>
 
+      {/* Top Footer - Add Stock Button */}
+      <div className="bg-card border-b border-border px-4 py-2 flex-shrink-0">
+        <button 
+          onClick={() => setShowAddProduct(true)}
+          className="px-4 py-2 primary-gradient text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          Tambah Stok Produk
+        </button>
+      </div>
+
       {activePage === 'dashboard' && (
         <div className="flex-1 overflow-y-auto">
           <CashierDashboard />
@@ -397,13 +400,6 @@ export default function CashierPOS() {
                   <option key={unit.id} value={unit.id}>{unit.name}</option>
                 ))}
               </select>
-              <button 
-                onClick={() => setShowAddProduct(true)}
-                className="px-4 py-2.5 primary-gradient text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Tambah Produk
-              </button>
             </div>
             <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
               {filteredProducts.map(p => {
@@ -688,6 +684,7 @@ export default function CashierPOS() {
                   <p className="text-xs font-bold text-foreground">{invoiceType === 'invoice' ? 'INVOICE' : 'FAKTUR PENJUALAN'}</p>
                   <p className="text-xs text-muted-foreground">No: {showInvoice.id.slice(-6).toUpperCase()}</p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(showInvoice.date)}</p>
+                  <p className="text-xs text-muted-foreground">Kasir: {showInvoice.cashierName || currentUser?.name}</p>
                 </div>
               </div>
 
@@ -961,98 +958,68 @@ export default function CashierPOS() {
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowAddProduct(false)}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-border flex items-center justify-between">
-              <h3 className="text-lg font-bold text-foreground">Tambah Produk</h3>
+              <h3 className="text-lg font-bold text-foreground">Tambah Stok Produk</h3>
               <button onClick={() => setShowAddProduct(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 block">Nama Produk *</label>
-                <input
-                  type="text"
-                  value={newProduct.name}
-                  onChange={e => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
+                <label className="text-sm font-medium text-foreground mb-2 block">Pilih Produk *</label>
+                <select
+                  value={addStockProduct.productId}
+                  onChange={e => setAddStockProduct(prev => ({ ...prev, productId: e.target.value }))}
                   className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Masukkan nama produk"
-                />
+                >
+                  <option value="">-- Pilih Produk --</option>
+                  {unitProducts.map(product => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} (Stok: {product.stock})
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 block">SKU</label>
+                <label className="text-sm font-medium text-foreground mb-2 block">Jumlah Stok Tambahan *</label>
                 <input
-                  type="text"
-                  value={newProduct.sku}
-                  onChange={e => setNewProduct(prev => ({ ...prev, sku: e.target.value }))}
+                  type="number"
+                  value={addStockProduct.additionalStock}
+                  onChange={e => setAddStockProduct(prev => ({ ...prev, additionalStock: Number(e.target.value) }))}
                   className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Kode produk (opsional)"
+                  placeholder="0"
+                  min="1"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Harga Jual *</label>
-                  <input
-                    type="number"
-                    value={newProduct.price}
-                    onChange={e => setNewProduct(prev => ({ ...prev, price: Number(e.target.value) }))}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">HPP</label>
-                  <input
-                    type="number"
-                    value={newProduct.hpp}
-                    onChange={e => setNewProduct(prev => ({ ...prev, hpp: Number(e.target.value) }))}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Stok *</label>
-                  <input
-                    type="number"
-                    value={newProduct.stock}
-                    onChange={e => setNewProduct(prev => ({ ...prev, stock: Number(e.target.value) }))}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Stok Minimum</label>
-                  <input
-                    type="number"
-                    value={newProduct.minStock}
-                    onChange={e => setNewProduct(prev => ({ ...prev, minStock: Number(e.target.value) }))}
-                    className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    placeholder="0"
-                    min="0"
-                  />
-                </div>
               </div>
 
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 block">Supplier</label>
-                <input
-                  type="text"
-                  value={newProduct.supplier}
-                  onChange={e => setNewProduct(prev => ({ ...prev, supplier: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Nama supplier"
+                <label className="text-sm font-medium text-foreground mb-2 block">Catatan</label>
+                <textarea
+                  value={addStockProduct.notes}
+                  onChange={e => setAddStockProduct(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  placeholder="Catatan tambahan (opsional)"
+                  rows={3}
                 />
               </div>
 
+              {addStockProduct.productId && (
+                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                  <p className="font-medium text-foreground mb-1">Informasi Produk:</p>
+                  {(() => {
+                    const selectedProduct = products.find(p => p.id === addStockProduct.productId);
+                    return selectedProduct ? (
+                      <>
+                        <p className="text-muted-foreground">Nama: <span className="text-foreground">{selectedProduct.name}</span></p>
+                        <p className="text-muted-foreground">Stok Saat Ini: <span className="text-foreground">{selectedProduct.stock}</span></p>
+                        <p className="text-muted-foreground">Stok Setelah Ditambah: <span className="text-primary font-bold">{selectedProduct.stock + addStockProduct.additionalStock}</span></p>
+                      </>
+                    ) : null;
+                  })()}
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button onClick={handleAddProduct} className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
-                  Tambah Produk
+                  Tambah Stok
                 </button>
                 <button onClick={() => setShowAddProduct(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors">
                   Batal
