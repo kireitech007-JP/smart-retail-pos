@@ -142,49 +142,93 @@ function backupAllData(allData) {
   const results = {};
   
   try {
-    // Backup semua tabel
-    if (allData.kategori) {
+    // Cek apakah allData ada dan adalah object
+    if (!allData || typeof allData !== 'object') {
+      throw new Error('Invalid data format: allData must be an object');
+    }
+    
+    // Backup semua tabel dengan validasi
+    if (allData.kategori && Array.isArray(allData.kategori)) {
       results.kategori = backupKategori(allData.kategori);
+    } else {
+      results.kategori = { count: 0, message: 'Kategori data not found or invalid' };
     }
-    if (allData.satuan) {
+    
+    if (allData.satuan && Array.isArray(allData.satuan)) {
       results.satuan = backupSatuan(allData.satuan);
+    } else {
+      results.satuan = { count: 0, message: 'Satuan data not found or invalid' };
     }
-    if (allData.produk) {
+    
+    if (allData.produk && Array.isArray(allData.produk)) {
       results.produk = backupProduk(allData.produk);
+    } else {
+      results.produk = { count: 0, message: 'Produk data not found or invalid' };
     }
-    if (allData.pengguna) {
+    
+    if (allData.pengguna && Array.isArray(allData.pengguna)) {
       results.pengguna = backupPengguna(allData.pengguna);
+    } else {
+      results.pengguna = { count: 0, message: 'Pengguna data not found or invalid' };
     }
-    if (allData.unit) {
+    
+    if (allData.unit && Array.isArray(allData.unit)) {
       results.unit = backupUnit(allData.unit);
+    } else {
+      results.unit = { count: 0, message: 'Unit data not found or invalid' };
     }
-    if (allData.transaksi) {
+    
+    if (allData.transaksi && Array.isArray(allData.transaksi)) {
       results.transaksi = backupTransaksi(allData.transaksi);
+    } else {
+      results.transaksi = { count: 0, message: 'Transaksi data not found or invalid' };
     }
-    if (allData.transaksiItems) {
+    
+    if (allData.transaksiItems && Array.isArray(allData.transaksiItems)) {
       results.transaksiItems = backupTransaksiItems(allData.transaksiItems);
+    } else {
+      results.transaksiItems = { count: 0, message: 'Transaksi items data not found or invalid' };
     }
-    if (allData.piutang) {
+    
+    if (allData.piutang && Array.isArray(allData.piutang)) {
       results.piutang = backupPiutang(allData.piutang);
+    } else {
+      results.piutang = { count: 0, message: 'Piutang data not found or invalid' };
     }
-    if (allData.kasMasuk) {
+    
+    if (allData.kasMasuk && Array.isArray(allData.kasMasuk)) {
       results.kasMasuk = backupKasMasuk(allData.kasMasuk);
+    } else {
+      results.kasMasuk = { count: 0, message: 'Kas masuk data not found or invalid' };
     }
-    if (allData.pengeluaran) {
+    
+    if (allData.pengeluaran && Array.isArray(allData.pengeluaran)) {
       results.pengeluaran = backupPengeluaran(allData.pengeluaran);
+    } else {
+      results.pengeluaran = { count: 0, message: 'Pengeluaran data not found or invalid' };
     }
-    if (allData.laporan) {
+    
+    if (allData.laporan && Array.isArray(allData.laporan)) {
       results.laporan = backupLaporan(allData.laporan);
+    } else {
+      results.laporan = { count: 0, message: 'Laporan data not found or invalid' };
     }
-    if (allData.sessions) {
+    
+    if (allData.sessions && Array.isArray(allData.sessions)) {
       results.sessions = backupSessions(allData.sessions);
+    } else {
+      results.sessions = { count: 0, message: 'Sessions data not found or invalid' };
     }
     
     return {
       success: true,
       results: results,
       message: 'All data backed up successfully',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      summary: {
+        totalTables: Object.keys(results).length,
+        totalRecords: Object.values(results).reduce((sum, result) => sum + (result.count || 0), 0)
+      }
     };
     
   } catch (error) {
@@ -796,6 +840,87 @@ function setupBackupSheets() {
 }
 
 /**
+ * Test function untuk debugging data structure
+ */
+function debugDataStructure() {
+  return {
+    expectedStructure: {
+      kategori: 'array of category objects',
+      satuan: 'array of unit objects', 
+      produk: 'array of product objects',
+      pengguna: 'array of user objects',
+      unit: 'array of store objects',
+      transaksi: 'array of transaction objects',
+      transaksiItems: 'array of transaction item objects',
+      piutang: 'array of debt objects',
+      kasMasuk: 'array of cash in objects',
+      pengeluaran: 'array of expense objects',
+      laporan: 'array of report objects',
+      sessions: 'array of session objects'
+    },
+    examplePayload: {
+      action: 'backupAllData',
+      data: {
+        kategori: [
+          { id: 'kat1', nama: 'Makanan', deskripsi: 'Kategori makanan' }
+        ],
+        satuan: [
+          { id: 'sat1', nama: 'Pcs', deskripsi: 'Pieces' }
+        ],
+        produk: [
+          { id: 'prod1', nama: 'Nasi Goreng', sku: 'NG001', kategori_id: 'kat1', satuan_id: 'sat1', harga: 15000, hpp: 10000, stok: 50 }
+        ],
+        pengguna: [
+          { id: 'user1', nama: 'Admin', email: 'admin@store.com', password: 'hashed123', role: 'admin', unit_id: 'unit1', status: 'active' }
+        ],
+        unit: [
+          { id: 'unit1', nama: 'Toko Utama', alamat: 'Jl. Merdeka No. 1', telepon: '08123456789' }
+        ],
+        transaksi: [],
+        transaksiItems: [],
+        piutang: [],
+        kasMasuk: [],
+        pengeluaran: [],
+        laporan: [],
+        sessions: []
+      }
+    }
+  };
+}
+
+/**
+ * Test backup dengan sample data
+ */
+function testBackupWithSampleData() {
+  const sampleData = {
+    kategori: [
+      { id: 'kat1', nama: 'Makanan', deskripsi: 'Kategori makanan', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    satuan: [
+      { id: 'sat1', nama: 'Pcs', deskripsi: 'Pieces', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    produk: [
+      { id: 'prod1', nama: 'Nasi Goreng', sku: 'NG001', kategori_id: 'kat1', satuan_id: 'sat1', harga: 15000, hpp: 10000, stok: 50, min_stok: 5, supplier: 'Supplier A', unit_id: 'unit1', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    pengguna: [
+      { id: 'user1', nama: 'Admin', email: 'admin@store.com', password: 'hashed123', role: 'admin', unit_id: 'unit1', status: 'active', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    unit: [
+      { id: 'unit1', nama: 'Toko Utama', alamat: 'Jl. Merdeka No. 1', telepon: '08123456789', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+    ],
+    transaksi: [],
+    transaksiItems: [],
+    piutang: [],
+    kasMasuk: [],
+    pengeluaran: [],
+    laporan: [],
+    sessions: []
+  };
+  
+  return backupAllData(sampleData);
+}
+
+/**
  * Test function
  */
 function testBackupConnection() {
@@ -804,7 +929,8 @@ function testBackupConnection() {
     message: 'Google Apps Script Backup connection successful',
     timestamp: new Date().toISOString(),
     spreadsheet: SpreadsheetApp.getActiveSpreadsheet().getName(),
-    availableSheets: Object.values(CONFIG.SHEETS)
+    availableSheets: Object.values(CONFIG.SHEETS),
+    debugInfo: debugDataStructure()
   };
 }
 
