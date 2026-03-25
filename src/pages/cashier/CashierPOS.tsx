@@ -4,13 +4,14 @@ import { formatRupiah, formatDateTime } from '@/lib/format';
 import { 
   ShoppingCart, Plus, Minus, X, Search, DollarSign, CreditCard, Banknote, 
   Receipt, Package, LogOut, Store, Wallet, TrendingDown, FileText, 
-  Printer, Download, MessageSquare, Clock, AlertTriangle
+  Printer, Download, MessageSquare, Clock, AlertTriangle, Cloud
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CashIn from '@/components/CashIn';
 import CashierDashboard from '@/components/CashierDashboard';
 import ExportButtons from '@/components/ExportButtons';
 import PrintButtons from '@/components/PrintButtons';
+import CloudSettings from '@/components/CloudSettings';
 
 export default function CashierPOS() {
   const { 
@@ -28,7 +29,7 @@ export default function CashierPOS() {
   const [showInvoice, setShowInvoice] = useState<Transaction | null>(null);
   const [showCashierOpen, setShowCashierOpen] = useState(false);
   const [showCashierClose, setShowCashierClose] = useState(false);
-  const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'expense' | 'debt'>('dashboard');
+  const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'expense' | 'debt' | 'cloud'>('dashboard');
 
   // Payment state
   const [paymentType, setPaymentType] = useState<'cash' | 'transfer' | 'credit'>('cash');
@@ -264,10 +265,10 @@ export default function CashierPOS() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {['dashboard', 'cashin', 'pos', 'expense', 'debt'].map(page => (
+          {['dashboard', 'cashin', 'pos', 'expense', 'debt', 'cloud'].map(page => (
             <button key={page} onClick={() => setActivePage(page as any)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-              {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
+              {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : page === 'debt' ? 'Piutang' : 'Cloud'}
             </button>
           ))}
           <button onClick={() => setShowCashierClose(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20">
@@ -458,6 +459,12 @@ export default function CashierPOS() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activePage === 'cloud' && (
+        <div className="flex-1 p-6 overflow-y-auto">
+          <CloudSettings />
         </div>
       )}
 
