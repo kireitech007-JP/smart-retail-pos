@@ -11,6 +11,7 @@ interface SupabaseConfig {
 }
 
 export default function CloudSettings() {
+  console.log('CloudSettings component mounted');
   const { storeSettings, updateStoreSettings } = useApp();
   const [supabaseConfig, setSupabaseConfig] = useState<SupabaseConfig>({
     url: '',

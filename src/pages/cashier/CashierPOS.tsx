@@ -265,12 +265,18 @@ export default function CashierPOS() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {['dashboard', 'cashin', 'pos', 'expense', 'debt', 'cloud'].map(page => (
-            <button key={page} onClick={() => setActivePage(page as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-              {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : page === 'debt' ? 'Piutang' : 'Cloud'}
-            </button>
-          ))}
+          {['dashboard', 'cashin', 'pos', 'expense', 'debt', 'cloud'].map(page => {
+            console.log('Rendering menu item:', page, 'activePage:', activePage);
+            return (
+              <button key={page} onClick={() => {
+                console.log('Clicked menu:', page);
+                setActivePage(page as any);
+              }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
+                {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : page === 'debt' ? 'Piutang' : 'Cloud'}
+              </button>
+            );
+          })}
           <button onClick={() => setShowCashierClose(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20">
             <Clock className="w-3 h-3 inline mr-1" />Tutup Kasir
           </button>
@@ -464,6 +470,7 @@ export default function CashierPOS() {
 
       {activePage === 'cloud' && (
         <div className="flex-1 p-6 overflow-y-auto">
+          {console.log('Rendering CloudSettings component, activePage:', activePage)}
           <CloudSettings />
         </div>
       )}
