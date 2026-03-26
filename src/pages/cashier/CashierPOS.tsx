@@ -104,6 +104,13 @@ export default function CashierPOS() {
     notes: string;
   } | null>(null);
 
+  // Debt payment state
+  const [showDebtPayment, setShowDebtPayment] = useState(false);
+  const [selectedDebt, setSelectedDebt] = useState<any>(null);
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [showDebtInvoice, setShowDebtInvoice] = useState(false);
+
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
 
@@ -552,6 +559,71 @@ export default function CashierPOS() {
     setEditingStock(null);
     setShowEditStock(false);
     toast.success(`Stok ${selectedProduct.name} berhasil diperbarui!`);
+  };
+
+  // Debt payment functions
+  const handlePayDebt = (debt: any) => {
+    setSelectedDebt(debt);
+    setPaymentAmount(debt.remainingAmount);
+    setPaymentNotes('');
+    setShowDebtPayment(true);
+  };
+
+  const handleProcessDebtPayment = () => {
+    if (!selectedDebt || paymentAmount <= 0) {
+      toast.error('Masukkan jumlah pembayaran yang valid!');
+      return;
+    }
+
+    if (paymentAmount > selectedDebt.remainingAmount) {
+      toast.error('Jumlah pembayaran melebihi sisa piutang!');
+      return;
+    }
+
+    // Process payment
+    payDebt(selectedDebt.id, paymentAmount, paymentNotes);
+    
+    // Create invoice data
+    const invoiceData = {
+      id: 'DEBT_' + Date.now(),
+      date: new Date().toISOString(),
+      customerName: selectedDebt.customerName,
+      customerPhone: selectedDebt.customerPhone,
+      totalAmount: paymentAmount,
+      paymentType: 'cash',
+      type: 'debt_payment',
+      originalDebtId: selectedDebt.id,
+      originalDebtAmount: selectedDebt.totalAmount,
+      remainingAmount: selectedDebt.remainingAmount - paymentAmount,
+      notes: paymentNotes,
+      cashierName: currentUser?.name,
+      unitName: userUnit?.name
+    };
+
+    // Reset form
+    setShowDebtPayment(false);
+    setShowDebtInvoice(true);
+    setSelectedDebt(null);
+    setPaymentAmount(0);
+    setPaymentNotes('');
+    
+    toast.success('Pembayaran piutang berhasil diproses!');
+  };
+
+  const handlePrintDebtInvoice = () => {
+    // Print logic will be handled by PrintButtons component
+    window.print();
+  };
+
+  const handleWhatsAppDebtInvoice = () => {
+    if (!showDebtInvoice) return;
+    const msg = `*BUKTI PEMBAYARAN PIUTANG*\n${storeSettings.storeName}\nNo: DEBT-${Date.now().toString().slice(-6).toUpperCase()}\n\nPelanggan: ${selectedDebt?.customerName}\nJumlah Bayar: ${formatRupiah(paymentAmount)}\nSisa Piutang: ${formatRupiah((selectedDebt?.remainingAmount || 0) - paymentAmount)}\n\nTerima kasih telah melakukan pembayaran.`;
+    const phone = selectedDebt?.customerPhone?.replace(/[^0-9]/g, '');
+    if (phone) {
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+    } else {
+      toast.error('Nomor telepon pelanggan tidak tersedia');
+    }
   };
 
   // Session report data

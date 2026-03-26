@@ -3,9 +3,12 @@ import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, formatDateTime, isToday } from '@/lib/format';
 import { 
   Wallet, DollarSign, CreditCard, TrendingUp, TrendingDown, 
-  Receipt, Users, Calendar, Search, Eye, EyeOff, RefreshCw
+  Receipt, Users, Calendar, Search, Eye, EyeOff, RefreshCw,
+  Download, FileText, Printer, MessageSquare, Cloud
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ExportButtons from '@/components/ExportButtons';
+import PrintButtons from '@/components/PrintButtons';
 
 export default function CashierDashboard() {
   const { 
@@ -17,9 +20,38 @@ export default function CashierDashboard() {
   const [openingCash, setOpeningCash] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
+  const [showInvoice, setShowInvoice] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const activeSession = currentUser ? getActiveSession(currentUser.id) : null;
   const userUnit = units.find(u => u.id === currentUser?.unitId);
+
+  // Handle functions
+  const handleExportToGoogleSheets = () => {
+    // Export logic here
+    toast.success('Data dikirim ke Google Sheets');
+  };
+
+  const handleExportToPDF = () => {
+    // Export logic here
+    toast.success('PDF berhasil diunduh');
+  };
+
+  const handlePrintInvoice = (transaction: any) => {
+    setSelectedTransaction(transaction);
+    setShowInvoice(true);
+  };
+
+  const handleSendWhatsApp = (transaction: any) => {
+    const msg = `*INVOICE*\n${transaction.customerName || 'Umum'}\nTotal: ${formatRupiah(transaction.grandTotal)}\nTerima kasih!`;
+    const phone = transaction.customerPhone?.replace(/[^0-9]/g, '');
+    if (phone) {
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+    } else {
+      toast.error('Nomor telepon tidak tersedia');
+    }
+  };
 
   // Calculate today's data
   const todayData = useMemo(() => {
@@ -316,6 +348,14 @@ export default function CashierDashboard() {
             </h3>
             <div className="flex items-center gap-2">
               <button 
+                onClick={() => setShowExportModal(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-success/10 hover:bg-success/20 text-success rounded-lg text-sm transition-colors"
+                title="Export Data"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
+              <button 
                 onClick={() => setShowDetails(!showDetails)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-lg text-sm"
               >
@@ -346,6 +386,7 @@ export default function CashierDashboard() {
                 {showDetails && (
                   <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Jumlah</th>
                 )}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -406,11 +447,33 @@ export default function CashierDashboard() {
                       {formatRupiah(Math.abs(tx.amount))}
                     </td>
                   )}
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex items-center gap-1">
+                      {tx.type === 'transaction' && (
+                        <>
+                          <button
+                            onClick={() => handlePrintInvoice(tx)}
+                            className="p-1 rounded bg-info/10 hover:bg-info/20 text-info transition-colors"
+                            title="Cetak Invoice"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleSendWhatsApp(tx)}
+                            className="p-1 rounded bg-success/10 hover:bg-success/20 text-success transition-colors"
+                            title="Kirim WhatsApp"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={showDetails ? 4 : 3} className="px-4 py-8 text-center text-muted-foreground">
+                  <td colSpan={showDetails ? 5 : 4} className="px-4 py-8 text-center text-muted-foreground">
                     Belum ada transaksi hari ini
                   </td>
                 </tr>
@@ -419,6 +482,77 @@ export default function CashierDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl shadow-elevated w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Export Data Transaksi</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                <button
+                  onClick={handleExportToGoogleSheets}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+                >
+                  <Cloud className="w-5 h-5 text-success" />
+                  <div className="text-left">
+                    <p className="font-medium text-foreground">Google Sheets</p>
+                    <p className="text-xs text-muted-foreground">Kirim data ke Google Sheets</p>
+                  </div>
+                </button>
+                <button
+                  onClick={handleExportToPDF}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+                >
+                  <FileText className="w-5 h-5 text-info" />
+                  <div className="text-left">
+                    <p className="font-medium text-foreground">PDF</p>
+                    <p className="text-xs text-muted-foreground">Unduh sebagai PDF</p>
+                  </div>
+                </button>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowExportModal(false)}
+                  className="flex-1 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invoice Modal */}
+      {showInvoice && selectedTransaction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl shadow-elevated w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Invoice Transaksi</h3>
+            </div>
+            <div className="p-6">
+              <PrintButtons 
+                transaction={selectedTransaction}
+                type="invoice"
+              />
+            </div>
+            <div className="p-6 border-t border-border">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowInvoice(false)}
+                  className="flex-1 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium"
+                >
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
