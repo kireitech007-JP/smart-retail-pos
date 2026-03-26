@@ -6,8 +6,21 @@ import { Transaction } from '@/contexts/AppContext';
 interface PrintButtonsProps {
   transaction?: Transaction;
   transactions?: Transaction[];
-  type?: 'invoice' | 'faktur' | 'receipt';
-  sessionData?: any;
+  type: 'invoice' | 'faktur' | 'session';
+  sessionData?: {
+    cashierName?: string;
+    unitName?: string;
+    sessionId?: string;
+    openTime?: string;
+    openingCash?: number;
+    totalSales?: number;
+    totalCashIn?: number;
+    totalExpenses?: number;
+    totalPaidToday?: number;
+    finalBalance?: number;
+    transactionCount?: number;
+  };
+  sessionTransactions?: any[];
 }
 
 interface PrinterConfig {
@@ -15,13 +28,15 @@ interface PrinterConfig {
   name: string;
   connected: boolean;
   paperWidth: number;
+  paperSize?: '80mm' | '21x16.5cm' | '9.5x11in'; // Added paper size options
 }
 
 export default function PrintButtons({ 
   transaction, 
   transactions = [], 
   type = 'invoice', 
-  sessionData 
+  sessionData, 
+  sessionTransactions 
 }: PrintButtonsProps) {
   const [showPrinterModal, setShowPrinterModal] = useState(false);
   const [selectedPrinter, setSelectedPrinter] = useState<PrinterConfig>({
@@ -33,22 +48,37 @@ export default function PrintButtons({
 
   const printers: PrinterConfig[] = [
     {
-      type: 'bluetooth',
-      name: 'Bluetooth Printer',
+      type: 'thermal',
+      name: 'Default Thermal Printer',
       connected: true,
       paperWidth: 58
     },
     {
-      type: 'thermal', 
-      name: 'USB Thermal Printer',
-      connected: true,
-      paperWidth: 80
+      type: 'bluetooth',
+      name: 'Bluetooth Portable Printer',
+      connected: false,
+      paperWidth: 58
     },
     {
       type: 'dotmatrix',
-      name: 'Dot Matrix Printer',
+      name: 'Dot Matrix 80mm',
       connected: true,
-      paperWidth: 80
+      paperWidth: 80,
+      paperSize: '80mm'
+    },
+    {
+      type: 'dotmatrix',
+      name: 'Dot Matrix 21x16.5cm',
+      connected: false,
+      paperWidth: 210, // 21cm in mm
+      paperSize: '21x16.5cm'
+    },
+    {
+      type: 'dotmatrix',
+      name: 'Dot Matrix 9.5x11in',
+      connected: false,
+      paperWidth: 241, // 9.5in in mm
+      paperSize: '9.5x11in'
     }
   ];
 
@@ -453,8 +483,48 @@ export default function PrintButtons({
     const isDotMatrix = selectedPrinter.type === 'dotmatrix';
     
     const paperWidth = selectedPrinter.paperWidth;
-    const fontSize = isThermal || isBluetooth ? '9px' : '11px';
-    const fontFamily = isDotMatrix ? 'Courier New, monospace' : 'Arial, sans-serif';
+    const paperSize = selectedPrinter.paperSize;
+    
+    // Dynamic sizing based on paper size
+    let fontSize, fontFamily, pageMargin, pageSize;
+    
+    if (isDotMatrix) {
+      fontFamily = 'Courier New, monospace';
+      
+      if (paperSize === '80mm') {
+        fontSize = '8px';
+        pageMargin = '5px';
+        pageSize = '80mm 297mm'; // 80mm x A4 height
+      } else if (paperSize === '21x16.5cm') {
+        fontSize = '10px';
+        pageMargin = '15px';
+        pageSize = '21cm 16.5cm';
+      } else if (paperSize === '9.5x11in') {
+        fontSize = '11px';
+        pageMargin = '20px';
+        pageSize = '9.5in 11in';
+      } else {
+        fontSize = '10px';
+        pageMargin = '20px';
+        pageSize = '9.5in 11in';
+      }
+    } else {
+      fontFamily = 'Arial, sans-serif';
+      fontSize = isThermal || isBluetooth ? '9px' : '11px';
+      pageMargin = isDotMatrix ? '20px' : '10px';
+      pageSize = '9.5in 11in';
+    }
+    
+    // Filter transactions from sessionTransactions
+    const transactions = sessionTransactions?.filter(item => item.Tipe === 'Transaksi') || [];
+    const payments = sessionTransactions?.filter(item => item.Tipe === 'Pembayaran') || [];
+    const cashIn = sessionTransactions?.filter(item => item.Tipe === 'Kas Masuk') || [];
+    const expenses = sessionTransactions?.filter(item => item.Tipe === 'Pengeluaran') || [];
+    const debtPayments = sessionTransactions?.filter(item => item.Tipe === 'Pelunasan Piutang') || [];
+    
+    // Adjust layout for different paper sizes
+    const isCompact = paperSize === '80mm';
+    const isLarge = paperSize === '21x16.5cm';
     
     return `
       <html>
@@ -462,53 +532,74 @@ export default function PrintButtons({
           <title>LAPORAN SESI KASIR</title>
           <style>
             @page { 
-              margin: ${isDotMatrix ? '20px' : '10px'}; 
-              size: 9.5in 11in;
+              margin: ${pageMargin}; 
+              size: ${pageSize};
             }
             body { 
               font-family: ${fontFamily}; 
               font-size: ${fontSize};
               margin: 0; 
-              padding: 10px;
-              line-height: 1.1;
+              padding: ${isCompact ? '5px' : '10px'};
+              line-height: ${isCompact ? '1.0' : '1.1'};
+              width: ${isCompact ? '80mm' : 'auto'};
             }
             .header { 
               text-align: center; 
-              margin-bottom: 15px;
+              margin-bottom: ${isCompact ? '8px' : '15px'};
               border-bottom: 2px solid #000;
-              padding-bottom: 10px;
+              padding-bottom: ${isCompact ? '5px' : '10px'};
             }
             .title { 
-              font-size: ${isDotMatrix ? '16px' : '14px'}; 
+              font-size: ${isDotMatrix ? (isCompact ? '12px' : '14px') : (isCompact ? '10px' : '12px')}; 
               font-weight: bold; 
-              margin: 5px 0;
+              margin: 3px 0;
             }
             .subtitle { 
-              font-size: ${isDotMatrix ? '11px' : '9px'}; 
-              margin: 2px 0;
+              font-size: ${isDotMatrix ? (isCompact ? '9px' : '11px') : (isCompact ? '7px' : '9px')}; 
+              margin: 1px 0;
             }
-            .summary { 
-              margin: 10px 0;
+            .section { 
+              margin: ${isCompact ? '8px' : '15px'} 0;
               border: 1px solid #000;
-              padding: 10px;
+              padding: ${isCompact ? '5px' : '8px'};
+            }
+            .section-title { 
+              font-weight: bold; 
+              margin-bottom: ${isCompact ? '3px' : '5px'};
+              border-bottom: 1px dashed #000;
+              padding-bottom: 2px;
+              font-size: ${isCompact ? '9px' : '10px'};
             }
             .summary-row { 
               display: flex; 
               justify-content: space-between; 
-              margin: 3px 0;
+              margin: ${isCompact ? '1px' : '3px'} 0;
+            }
+            .transaction-row { 
+              margin: ${isCompact ? '3px' : '5px'} 0;
+              border-bottom: 1px dotted #ccc;
+              padding-bottom: ${isCompact ? '2px' : '3px'};
+            }
+            .transaction-header { 
+              font-weight: bold;
+              font-size: ${isDotMatrix ? (isCompact ? '8px' : '10px') : (isCompact ? '7px' : '9px')};
+            }
+            .transaction-detail { 
+              font-size: ${isDotMatrix ? (isCompact ? '7px' : '8px') : (isCompact ? '6px' : '7px')};
+              margin: 1px 0;
             }
             .total-row { 
               font-weight: bold;
               border-top: 1px solid #000;
-              padding-top: 3px;
-              margin-top: 5px;
+              padding-top: 2px;
+              margin-top: ${isCompact ? '3px' : '5px'};
             }
             .footer { 
-              margin-top: 20px;
+              margin-top: ${isCompact ? '10px' : '20px'};
               text-align: center;
               border-top: 1px dashed #000;
-              padding-top: 10px;
-              font-size: ${isDotMatrix ? '9px' : '8px'};
+              padding-top: ${isCompact ? '5px' : '10px'};
+              font-size: ${isDotMatrix ? (isCompact ? '7px' : '9px') : (isCompact ? '6px' : '8px')};
             }
             @media print {
               body { margin: 0; }
@@ -522,15 +613,17 @@ export default function PrintButtons({
             <div class="subtitle">SMART RETAIL POS</div>
           </div>
           
-          <div class="summary">
+          <div class="section">
             <div class="summary-row">
               <span>Kasir:</span>
-              <span>${sessionData?.cashierName || '-'}</span>
+              <span>${sessionData?.cashirName || '-'}</span>
             </div>
+            ${!isCompact ? `
             <div class="summary-row">
               <span>Unit:</span>
               <span>${sessionData?.unitName || '-'}</span>
             </div>
+            ` : ''}
             <div class="summary-row">
               <span>Sesi ID:</span>
               <span>${sessionData?.sessionId || '-'}</span>
@@ -545,7 +638,7 @@ export default function PrintButtons({
             </div>
           </div>
           
-          <div class="summary">
+          <div class="section">
             <div class="summary-row">
               <span>Modal Awal:</span>
               <span>${formatRupiah(sessionData?.openingCash || 0)}</span>
@@ -572,12 +665,115 @@ export default function PrintButtons({
             </div>
           </div>
           
-          <div class="summary">
-            <div class="summary-row">
-              <span>Jumlah Transaksi:</span>
-              <span>${sessionData?.transactionCount || 0}</span>
-            </div>
+          ${!isCompact && transactions.length > 0 ? `
+          <div class="section">
+            <div class="section-title">DETAIL TRANSAKSI (${transactions.length})</div>
+            ${transactions.slice(0, isLarge ? 20 : 10).map(tx => `
+              <div class="transaction-row">
+                <div class="transaction-header">
+                  ${tx.ID} - ${tx.Pelanggan || 'Umum'} - ${formatRupiah(tx.Total)}
+                </div>
+                <div class="transaction-detail">
+                  Metode: ${tx['Metode Pembayaran']} ${tx.DP ? `| DP: ${formatRupiah(tx.DP)}` : ''}
+                </div>
+                ${!isCompact ? `
+                <div class="transaction-detail">
+                  ${tx['Detail Produk'] || '-'}
+                </div>
+                ` : ''}
+              </div>
+            `).join('')}
+            ${transactions.length > (isLarge ? 20 : 10) ? `
+              <div class="transaction-detail">
+                ... dan ${transactions.length - (isLarge ? 20 : 10)} transaksi lainnya
+              </div>
+            ` : ''}
           </div>
+          ` : ''}
+          
+          ${!isCompact && payments.length > 0 ? `
+          <div class="section">
+            <div class="section-title">DETAIL PEMBAYARAN</div>
+            ${payments.slice(0, 10).map(payment => `
+              <div class="transaction-row">
+                <div class="transaction-header">
+                  ${payment.ID} - ${payment.Pelanggan || 'Umum'} - ${payment.Metode}
+                </div>
+                <div class="transaction-detail">
+                  Jumlah: ${formatRupiah(payment.Jumlah)} ${payment.DP ? `| DP: ${formatRupiah(payment.DP)}` : ''} ${payment.Sisa ? `| Sisa: ${formatRupiah(payment.Sisa)}` : ''}
+                </div>
+              </div>
+            `).join('')}
+            ${payments.length > 10 ? `
+              <div class="transaction-detail">
+                ... dan ${payments.length - 10} pembayaran lainnya
+              </div>
+            ` : ''}
+          </div>
+          ` : ''}
+          
+          ${!isCompact && cashIn.length > 0 ? `
+          <div class="section">
+            <div class="section-title">KAS MASUK (${cashIn.length})</div>
+            ${cashIn.slice(0, 5).map(ci => `
+              <div class="transaction-row">
+                <div class="transaction-header">
+                  ${ci.ID} - ${ci.Depositor}
+                </div>
+                <div class="transaction-detail">
+                  ${ci.Deskripsi} - ${formatRupiah(ci.Jumlah)}
+                </div>
+              </div>
+            `).join('')}
+            ${cashIn.length > 5 ? `
+              <div class="transaction-detail">
+                ... dan ${cashIn.length - 5} kas masuk lainnya
+              </div>
+            ` : ''}
+          </div>
+          ` : ''}
+          
+          ${!isCompact && expenses.length > 0 ? `
+          <div class="section">
+            <div class="section-title">PENGELUARAN (${expenses.length})</div>
+            ${expenses.slice(0, 5).map(exp => `
+              <div class="transaction-row">
+                <div class="transaction-header">
+                  ${exp.ID}
+                </div>
+                <div class="transaction-detail">
+                  ${exp.Deskripsi} - ${formatRupiah(exp.Jumlah)}
+                </div>
+              </div>
+            `).join('')}
+            ${expenses.length > 5 ? `
+              <div class="transaction-detail">
+                ... dan ${expenses.length - 5} pengeluaran lainnya
+              </div>
+            ` : ''}
+          </div>
+          ` : ''}
+          
+          ${!isCompact && debtPayments.length > 0 ? `
+          <div class="section">
+            <div class="section-title">PELUNASAN PIUTANG (${debtPayments.length})</div>
+            ${debtPayments.slice(0, 5).map(payment => `
+              <div class="transaction-row">
+                <div class="transaction-header">
+                  ${payment.ID} - ${payment.Pelanggan}
+                </div>
+                <div class="transaction-detail">
+                  ${formatRupiah(payment.Jumlah)}
+                </div>
+              </div>
+            `).join('')}
+            ${debtPayments.length > 5 ? `
+              <div class="transaction-detail">
+                ... dan ${debtPayments.length - 5} pelunasan lainnya
+              </div>
+            ` : ''}
+          </div>
+          ` : ''}
           
           <div class="footer">
             <div>Laporan sesi kasir berhasil dicetak</div>
@@ -708,7 +904,8 @@ export default function PrintButtons({
                         <div className="text-left">
                           <p className="font-medium text-foreground">{printer.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {printer.connected ? 'Tersambung' : 'Tidak tersambung'} • ${printer.paperWidth}mm
+                            {printer.connected ? 'Tersambung' : 'Tidak tersambung'} • 
+                            {printer.paperSize ? ` ${printer.paperSize.toUpperCase()}` : ` ${printer.paperWidth}mm`}
                           </p>
                         </div>
                       </div>

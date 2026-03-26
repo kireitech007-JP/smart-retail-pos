@@ -563,10 +563,10 @@ export default function CashierPOS() {
   const sessionCashInTotal = sessionCashIn.reduce((s, c) => s + c.amount, 0);
 
   // Prepare export data for cashier session report
-  const sessionReportData = useMemo(() => {
+  const sessionReportData: any[] = useMemo(() => {
     if (!activeSession) return [];
     
-    const reportData = [
+    const reportData: any[] = [
       {
         'Tanggal': formatDateTime(new Date().toISOString()),
         'Kasir': currentUser?.name || '',
@@ -583,16 +583,34 @@ export default function CashierPOS() {
     ];
 
     // Add transaction details
-    sessionTx.forEach(tx => {
-      reportData.push({
-        'Tanggal': formatDateTime(tx.date),
-        'Tipe': 'Transaksi',
-        'ID': tx.id.slice(-6).toUpperCase(),
-        'Pelanggan': tx.customerName || 'Umum',
-        'Pembayaran': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
-        'Total': tx.grandTotal,
-        'Item': tx.items.map(item => `${item.productName} x${item.qty}`).join(', ')
-      });
+    sessionTx.forEach((tx, index) => {
+      const items = tx.items.map(item => 
+        `${item.productName} x${item.qty} = ${formatRupiah(item.subtotal)}`
+      ).join(', ');
+      
+      reportData.push(
+        {
+          'Tanggal': formatDateTime(tx.date),
+          'Tipe': 'Transaksi',
+          'ID': tx.id.slice(-6).toUpperCase(),
+          'Pelanggan': tx.customerName || 'Umum',
+          'Metode Pembayaran': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
+          'DP': tx.dp || 0,
+          'Total': tx.grandTotal,
+          'Detail Produk': items,
+          'Kasir': tx.cashierName
+        },
+        {
+          'Tanggal': formatDateTime(tx.date),
+          'Tipe': 'Pembayaran',
+          'ID': tx.id.slice(-6).toUpperCase(),
+          'Metode': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
+          'Jumlah': tx.grandTotal,
+          'DP': tx.dp || 0,
+          'Sisa': tx.paymentType === 'credit' && tx.dp ? tx.grandTotal - tx.dp : 0,
+          'Pelanggan': tx.customerName || 'Umum'
+        }
+      );
     });
 
     // Add cash in details
@@ -601,8 +619,8 @@ export default function CashierPOS() {
         'Tanggal': formatDateTime(ci.date),
         'Tipe': 'Kas Masuk',
         'ID': ci.id.slice(-6).toUpperCase(),
-        'Penyetor': ci.depositorName,
-        'Keterangan': ci.description,
+        'Depositor': ci.depositorName,
+        'Deskripsi': ci.description,
         'Jumlah': ci.amount
       });
     });
@@ -613,13 +631,43 @@ export default function CashierPOS() {
         'Tanggal': formatDateTime(exp.date),
         'Tipe': 'Pengeluaran',
         'ID': exp.id.slice(-6).toUpperCase(),
-        'Keterangan': exp.description,
-        'Jumlah': -exp.amount
+        'Deskripsi': exp.description,
+        'Jumlah': exp.amount
+      });
+    });
+
+    // Add debt payment details
+    const debtPayments = debts
+      .filter(d => d.unitId === activeSession.unitId)
+      .flatMap(d => 
+        (d.payments || [])
+          .filter(p => new Date(p.date) >= new Date(activeSession.startTime) && 
+                       (!activeSession.endTime || new Date(p.date) <= new Date(activeSession.endTime)))
+          .map(p => ({
+            ...p,
+            customerName: d.customerName,
+            debtId: d.id
+          }))
+      );
+
+    debtPayments.forEach((payment, idx) => {
+      reportData.push({
+        'Tanggal': formatDateTime(payment.date),
+        'Tipe': 'Pelunasan Piutang',
+        'ID': payment.debtId.slice(-6).toUpperCase(),
+        'Pelanggan': payment.customerName,
+        'Jumlah': payment.amount
       });
     });
 
     return reportData;
-  }, [activeSession, sessionTx, sessionExp, sessionCashIn, sessionSales, sessionExpTotal, sessionCashInTotal, currentUser, units]);
+  }, [activeSession, currentUser, units, sessionTx, sessionCashIn, sessionExp, sessionSales, sessionCashInTotal, sessionExpTotal, debts]);
+
+  const getProductStock = (product: Product) => {
+    const realTime = realTimeStock[product.id];
+    if (realTime !== undefined) return realTime;
+    return product.initialStock + product.addedStock - product.soldStock;
+  };
 
   if (!activeSession && !['dashboard', 'cashin'].includes(activePage)) {
     return (
@@ -1363,6 +1411,7 @@ export default function CashierPOS() {
                     finalBalance: activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
                     transactionCount: sessionTx.length
                   }}
+                  sessionTransactions={sessionReportData}
                   type="session"
                 />
               </div>
