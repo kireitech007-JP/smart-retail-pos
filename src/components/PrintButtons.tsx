@@ -575,6 +575,13 @@ export default function PrintButtons({
               justify-content: space-between; 
               margin: ${isCompact ? '1px' : '3px'} 0;
             }
+            .sub-row { 
+              display: flex; 
+              justify-content: space-between; 
+              margin: ${isCompact ? '1px' : '2px'} 0;
+              padding-left: ${isCompact ? '10px' : '15px'};
+              font-size: ${isDotMatrix ? (isCompact ? '7px' : '9px') : (isCompact ? '6px' : '8px')};
+            }
             .transaction-row { 
               margin: ${isCompact ? '3px' : '5px'} 0;
               border-bottom: 1px dotted #ccc;
@@ -647,6 +654,26 @@ export default function PrintButtons({
               <span>Total Penjualan:</span>
               <span>${formatRupiah(sessionData?.totalSales || 0)}</span>
             </div>
+            <div class="sub-row">
+              <span>  • Tunai:</span>
+              <span>${formatRupiah(sessionData?.cashSales || 0)}</span>
+            </div>
+            <div class="sub-row">
+              <span>  • Transfer:</span>
+              <span>${formatRupiah(sessionData?.transferSales || 0)}</span>
+            </div>
+            <div class="sub-row">
+              <span>  • Kredit:</span>
+              <span>${formatRupiah(sessionData?.creditSales || 0)}</span>
+            </div>
+            <div class="sub-row">
+              <span>  • DP:</span>
+              <span>${formatRupiah(sessionData?.dpPayments || 0)}</span>
+            </div>
+            <div class="sub-row">
+              <span>  • Sisa Kredit:</span>
+              <span>${formatRupiah(sessionData?.remainingCredit || 0)}</span>
+            </div>
             <div class="summary-row">
               <span>Kas Masuk:</span>
               <span>${formatRupiah(sessionData?.totalCashIn || 0)}</span>
@@ -664,53 +691,6 @@ export default function PrintButtons({
               <span>${formatRupiah(sessionData?.finalBalance || 0)}</span>
             </div>
           </div>
-          
-          ${!isCompact && transactions.length > 0 ? `
-          <div class="section">
-            <div class="section-title">DETAIL TRANSAKSI (${transactions.length})</div>
-            ${transactions.slice(0, isLarge ? 20 : 10).map(tx => `
-              <div class="transaction-row">
-                <div class="transaction-header">
-                  ${tx.ID} - ${tx.Pelanggan || 'Umum'} - ${formatRupiah(tx.Total)}
-                </div>
-                <div class="transaction-detail">
-                  Metode: ${tx['Metode Pembayaran']} ${tx.DP ? `| DP: ${formatRupiah(tx.DP)}` : ''}
-                </div>
-                ${!isCompact ? `
-                <div class="transaction-detail">
-                  ${tx['Detail Produk'] || '-'}
-                </div>
-                ` : ''}
-              </div>
-            `).join('')}
-            ${transactions.length > (isLarge ? 20 : 10) ? `
-              <div class="transaction-detail">
-                ... dan ${transactions.length - (isLarge ? 20 : 10)} transaksi lainnya
-              </div>
-            ` : ''}
-          </div>
-          ` : ''}
-          
-          ${!isCompact && payments.length > 0 ? `
-          <div class="section">
-            <div class="section-title">DETAIL PEMBAYARAN</div>
-            ${payments.slice(0, 10).map(payment => `
-              <div class="transaction-row">
-                <div class="transaction-header">
-                  ${payment.ID} - ${payment.Pelanggan || 'Umum'} - ${payment.Metode}
-                </div>
-                <div class="transaction-detail">
-                  Jumlah: ${formatRupiah(payment.Jumlah)} ${payment.DP ? `| DP: ${formatRupiah(payment.DP)}` : ''} ${payment.Sisa ? `| Sisa: ${formatRupiah(payment.Sisa)}` : ''}
-                </div>
-              </div>
-            `).join('')}
-            ${payments.length > 10 ? `
-              <div class="transaction-detail">
-                ... dan ${payments.length - 10} pembayaran lainnya
-              </div>
-            ` : ''}
-          </div>
-          ` : ''}
           
           ${!isCompact && cashIn.length > 0 ? `
           <div class="section">
