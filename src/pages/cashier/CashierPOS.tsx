@@ -197,6 +197,7 @@ export default function CashierPOS() {
     });
     
     setShowAddProduct(false);
+    setShowStockHistory(true); // Buka langsung riwayat
     toast.success(`Stok ${selectedProduct.name} berhasil ditambahkan! Riwayat tersimpan.`);
   };
 
@@ -1446,37 +1447,51 @@ export default function CashierPOS() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {stockHistory.map((entry) => (
-                    <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <h4 className="font-semibold text-foreground">{entry.productName}</h4>
-                          <p className="text-xs text-muted-foreground">Kasir: {entry.cashierName}</p>
-                          <p className="text-xs text-muted-foreground">{formatDateTime(entry.date)}</p>
+                  {stockHistory.map((entry) => {
+                    const product = products.find(p => p.id === entry.productId);
+                    const currentStock = product ? getProductStock(product) : 0;
+                    return (
+                      <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-semibold text-foreground">{entry.productName}</h4>
+                            <p className="text-xs text-muted-foreground">Kasir: {entry.cashierName}</p>
+                            <p className="text-xs text-muted-foreground">{formatDateTime(entry.date)}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
+                              +{entry.addedStock}
+                            </span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
-                            +{entry.addedStock}
-                          </span>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Stok Sebelumnya: </span>
+                            <span className="font-medium">{entry.oldStock}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Stok Setelah: </span>
+                            <span className="font-bold text-success">{entry.newStock}</span>
+                          </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                          <div>
+                            <span className="text-muted-foreground">Stok Saat Ini: </span>
+                            <span className="font-medium text-info">{currentStock}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Satuan: </span>
+                            <span className="font-medium">{product?.satuan || 'pcs'}</span>
+                          </div>
+                        </div>
+                        {entry.notes && (
+                          <div className="mt-2 pt-2 border-t border-border">
+                            <p className="text-xs text-muted-foreground">Catatan: {entry.notes}</p>
+                          </div>
+                        )}
                       </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Stok Sebelumnya: </span>
-                          <span className="font-medium">{entry.oldStock}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Stok Setelah: </span>
-                          <span className="font-bold text-success">{entry.newStock}</span>
-                        </div>
-                      </div>
-                      {entry.notes && (
-                        <div className="mt-2 pt-2 border-t border-border">
-                          <p className="text-xs text-muted-foreground">Catatan: {entry.notes}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
