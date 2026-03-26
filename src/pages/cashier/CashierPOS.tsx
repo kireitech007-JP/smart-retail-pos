@@ -94,6 +94,16 @@ export default function CashierPOS() {
   // Real-time stock tracking
   const [realTimeStock, setRealTimeStock] = useState<{[key: string]: number}>({});
 
+  // Edit stock state
+  const [showEditStock, setShowEditStock] = useState(false);
+  const [editingStock, setEditingStock] = useState<{
+    id: string;
+    productId: string;
+    productName: string;
+    currentStock: number;
+    notes: string;
+  } | null>(null);
+
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
 
@@ -487,6 +497,61 @@ export default function CashierPOS() {
     }
 
     toast.success('Preview PDF dibuka di browser baru');
+  };
+
+  // Edit stock functions
+  const handleEditStock = (entry: any) => {
+    const currentStock = realTimeStock[entry.productId] || getProductStock(products.find(p => p.id === entry.productId));
+    setEditingStock({
+      id: entry.id,
+      productId: entry.productId,
+      productName: entry.productName,
+      currentStock: currentStock,
+      notes: entry.notes || ''
+    });
+    setShowEditStock(true);
+  };
+
+  const handleUpdateStock = () => {
+    if (!editingStock) return;
+    
+    const selectedProduct = products.find(p => p.id === editingStock.productId);
+    if (!selectedProduct) {
+      toast.error('Produk tidak ditemukan!');
+      return;
+    }
+
+    const oldStock = realTimeStock[editingStock.productId] || getProductStock(selectedProduct);
+    const newStock = editingStock.currentStock;
+    const stockDifference = newStock - oldStock;
+    
+    // Update real-time stock
+    setRealTimeStock(prev => ({
+      ...prev,
+      [editingStock.productId]: newStock
+    }));
+    
+    // Add to history if stock changed
+    if (stockDifference !== 0) {
+      const historyEntry = {
+        id: 'stock_edit_' + Date.now(),
+        productId: selectedProduct.id,
+        productName: selectedProduct.name,
+        addedStock: stockDifference,
+        oldStock: oldStock,
+        newStock: newStock,
+        notes: `Edit stok: ${editingStock.notes}`,
+        date: new Date().toISOString(),
+        cashierName: currentUser?.name || 'Unknown'
+      };
+      
+      setStockHistory(prev => [historyEntry, ...prev]);
+    }
+    
+    // Reset form
+    setEditingStock(null);
+    setShowEditStock(false);
+    toast.success(`Stok ${selectedProduct.name} berhasil diperbarui!`);
   };
 
   // Session report data
@@ -1464,14 +1529,21 @@ export default function CashierPOS() {
                     return (
                       <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
                         <div className="flex justify-between items-start mb-2">
-                          <div>
+                          <div className="flex-1">
                             <h4 className="font-semibold text-foreground">{entry.productName}</h4>
                             <p className="text-xs text-muted-foreground">Kasir: {entry.cashierName}</p>
                             <p className="text-xs text-muted-foreground">{formatDateTime(entry.date)}</p>
                           </div>
-                          <div className="text-right">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleEditStock(entry)}
+                              className="p-1.5 rounded-lg bg-info/10 hover:bg-info/20 text-info transition-colors"
+                              title="Edit Stok"
+                            >
+                              <FileText className="w-4 h-4" />
+                            </button>
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
-                              +{entry.addedStock}
+                              {entry.addedStock > 0 ? '+' : ''}{entry.addedStock}
                             </span>
                           </div>
                         </div>
@@ -1513,6 +1585,76 @@ export default function CashierPOS() {
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Stock Modal */}
+      {showEditStock && editingStock && (
+        <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowEditStock(false)}>
+          <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">Edit Stok Produk</h3>
+              <button onClick={() => setShowEditStock(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Nama Produk</label>
+                <input
+                  type="text"
+                  value={editingStock.productName}
+                  disabled
+                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-muted text-foreground text-sm"
+                />
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Stok Saat Ini *</label>
+                <input
+                  type="number"
+                  value={editingStock.currentStock}
+                  onChange={e => setEditingStock(prev => prev ? { ...prev, currentStock: Number(e.target.value) } : null)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="0"
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-foreground mb-2 block">Catatan</label>
+                <textarea
+                  value={editingStock.notes}
+                  onChange={e => setEditingStock(prev => prev ? { ...prev, notes: e.target.value } : null)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  placeholder="Catatan perubahan stok (opsional)"
+                  rows={3}
+                />
+              </div>
+
+              {editingStock && (
+                <div className="bg-muted/50 rounded-lg p-3 text-sm">
+                  <p className="font-medium text-foreground mb-2">Informasi Perubahan:</p>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <p className="text-muted-foreground">Produk:</p>
+                    <p className="text-foreground font-medium">{editingStock.productName}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-muted-foreground">Stok Baru:</p>
+                    <p className="text-primary font-bold">{editingStock.currentStock} {products.find(p => p.id === editingStock.productId)?.satuan || 'pcs'}</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button onClick={handleUpdateStock} className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                  Update Stok
+                </button>
+                <button onClick={() => setShowEditStock(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors">
+                  Batal
+                </button>
+              </div>
             </div>
           </div>
         </div>
