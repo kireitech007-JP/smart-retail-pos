@@ -168,7 +168,8 @@ export default function CashierDashboard() {
         customerName: t.customerName,
         paymentType: t.paymentType,
         grandTotal: t.grandTotal,
-        subtotal: t.subtotal,
+        total: t.total,
+        subtotal: t.total, // Map total to subtotal for compatibility
         items: t.items,
         dp: t.dp,
         tax: t.tax,

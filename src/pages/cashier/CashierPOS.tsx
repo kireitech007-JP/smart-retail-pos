@@ -1986,6 +1986,8 @@ export default function CashierPOS() {
                     customerName: selectedDebt?.customerName,
                     customerPhone: selectedDebt?.customerPhone,
                     grandTotal: paymentAmount,
+                    total: paymentAmount,
+                    subtotal: paymentAmount, // For debt payment, use payment amount as subtotal
                     paymentType: 'cash',
                     items: [],
                     cashierName: currentUser?.name,
@@ -2000,6 +2002,8 @@ export default function CashierPOS() {
                     customerName: selectedDebt?.customerName,
                     customerPhone: selectedDebt?.customerPhone,
                     grandTotal: paymentAmount,
+                    total: paymentAmount,
+                    subtotal: paymentAmount, // For debt payment, use payment amount as subtotal
                     paymentType: 'cash',
                     items: [],
                     cashierName: currentUser?.name,

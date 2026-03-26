@@ -230,7 +230,7 @@ export default function PrintButtons({
           <div class="total">
             <div class="total-row">
               <span>Subtotal</span>
-              <span>${formatRupiah(tx.subtotal)}</span>
+              <span>${formatRupiah(tx.subtotal || tx.total || 0)}</span>
             </div>
             ${tx.discount > 0 ? `
               <div class="total-row">
@@ -828,7 +828,19 @@ export default function PrintButtons({
       )}
       
       {/* Faktur Print */}
-      {transactions.length > 0 && (
+      {transaction && (
+        <button
+          onClick={() => handlePrint('faktur')}
+          className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
+          title="Cetak Faktur"
+        >
+          <Receipt className="w-4 h-4" />
+          Faktur
+        </button>
+      )}
+      
+      {/* Faktur Print for transactions array */}
+      {!transaction && transactions.length > 0 && (
         <button
           onClick={() => handlePrint('faktur')}
           className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors"
