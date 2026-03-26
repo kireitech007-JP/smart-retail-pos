@@ -25,6 +25,7 @@ export default function CashierPOS() {
   const [showPayment, setShowPayment] = useState(false);
   const [showExpense, setShowExpense] = useState(false);
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showStockHistory, setShowStockHistory] = useState(false);
   const [showDebtMenu, setShowDebtMenu] = useState(false);
   const [showInvoice, setShowInvoice] = useState<Transaction | null>(null);
   const [showCashierOpen, setShowCashierOpen] = useState(false);
@@ -76,6 +77,19 @@ export default function CashierPOS() {
     description: '',
     date: new Date().toISOString()
   });
+
+  // Stock addition history
+  const [stockHistory, setStockHistory] = useState<Array<{
+    id: string;
+    productId: string;
+    productName: string;
+    addedStock: number;
+    oldStock: number;
+    newStock: number;
+    notes: string;
+    date: string;
+    cashierName: string;
+  }>>([]);
 
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
@@ -147,13 +161,29 @@ export default function CashierPOS() {
       return;
     }
 
-    // Update stock (in real implementation, this would update via context/API)
-    const updatedStock = selectedProduct.stock + addStockProduct.additionalStock;
+    // Calculate new stock
+    const oldStock = selectedProduct.stock;
+    const newStock = oldStock + addStockProduct.additionalStock;
+    
+    // Add to history
+    const historyEntry = {
+      id: 'stock_' + Date.now(),
+      productId: selectedProduct.id,
+      productName: selectedProduct.name,
+      addedStock: addStockProduct.additionalStock,
+      oldStock: oldStock,
+      newStock: newStock,
+      notes: addStockProduct.notes,
+      date: new Date().toISOString(),
+      cashierName: currentUser?.name || 'Unknown'
+    };
+    
+    setStockHistory(prev => [historyEntry, ...prev]);
     
     console.log('Stock updated for product:', selectedProduct.name, {
-      oldStock: selectedProduct.stock,
+      oldStock: oldStock,
       additionalStock: addStockProduct.additionalStock,
-      newStock: updatedStock,
+      newStock: newStock,
       notes: addStockProduct.notes
     });
 
@@ -165,7 +195,7 @@ export default function CashierPOS() {
     });
     
     setShowAddProduct(false);
-    toast.success(`Stok ${selectedProduct.name} berhasil ditambahkan!`);
+    toast.success(`Stok ${selectedProduct.name} berhasil ditambahkan! Riwayat tersimpan.`);
   };
 
   // Cart functions for kilogram sales
@@ -489,6 +519,7 @@ export default function CashierPOS() {
               {filteredProducts.map(p => {
                 const stock = getProductStock(p);
                 const inCart = cart.find(c => c.productId === p.id);
+                const productUnit = units.find(u => u.id === p.unitId);
                 return (
                   <button key={p.id} onClick={() => stock > 0 && addToCart(p.id, 1)} disabled={stock <= 0}
                     className={`bg-card rounded-xl p-4 text-left shadow-card hover:shadow-elevated transition-all relative ${stock <= 0 ? 'opacity-50' : 'hover:scale-[1.02]'}`}>
@@ -504,9 +535,27 @@ export default function CashierPOS() {
                     )}
                     <Package className="w-8 h-8 text-primary/30 mb-2" />
                     <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground">{p.supplier}</p>
-                    <p className="text-sm font-bold text-primary mt-1">{formatRupiah(p.price)}</p>
-                    <p className="text-xs text-muted-foreground">Stok: {stock}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.supplier}</p>
+                    <div className="mt-2 space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Satuan:</span>
+                        <span className="text-xs font-medium text-foreground">{p.satuan || 'pcs'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Unit:</span>
+                        <span className="text-xs font-medium text-foreground">{productUnit?.name || '-'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Harga:</span>
+                        <span className="text-sm font-bold text-primary">{formatRupiah(p.price)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-muted-foreground">Stok:</span>
+                        <span className={`text-xs font-medium ${stock <= 5 ? 'text-accent' : 'text-foreground'}`}>
+                          {stock} {p.satuan || 'pcs'}
+                        </span>
+                      </div>
+                    </div>
                   </button>
                 );
               })}
@@ -536,12 +585,20 @@ export default function CashierPOS() {
                 <div className="space-y-3">
                   {cartItems.map((c, index) => {
                     const product = products.find(p => p.id === c.productId);
+                    const productUnit = units.find(u => u.id === product?.unitId);
                     if (!product) return null;
                     
                     return (
                       <div key={c.productId} className="bg-background rounded-lg p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-foreground">{product.name}</h4>
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-foreground text-sm">{product.name}</h4>
+                            <p className="text-xs text-muted-foreground">{product.supplier}</p>
+                            <div className="mt-1 flex gap-2">
+                              <span className="text-xs bg-muted px-2 py-0.5 rounded">{product.satuan || 'pcs'}</span>
+                              <span className="text-xs bg-muted px-2 py-0.5 rounded">{productUnit?.name || '-'}</span>
+                            </div>
+                          </div>
                           <button 
                             onClick={() => removeFromCart(c.productId)}
                             className="text-destructive hover:bg-destructive/10 p-1 rounded"
@@ -549,24 +606,30 @@ export default function CashierPOS() {
                             <X className="w-4 h-4" />
                           </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <label className="text-muted-foreground">Jumlah</label>
-                            <input
-                              type="number"
-                              value={c.qty}
-                              onChange={e => {
-                                const newQty = parseFloat(e.target.value) || 0;
-                                updateCartQty(c.productId, newQty);
-                              }}
-                              className="w-full px-2 py-1 rounded border border-input bg-background text-foreground"
-                              step="0.1"
-                              min="0.1"
-                            />
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <label className="text-xs text-muted-foreground">Jumlah</label>
+                              <input
+                                type="number"
+                                value={c.qty}
+                                onChange={e => {
+                                  const newQty = parseFloat(e.target.value) || 0;
+                                  updateCartQty(c.productId, newQty);
+                                }}
+                                className="w-full px-2 py-1.5 rounded border border-input bg-background text-foreground text-sm"
+                                step="0.1"
+                                min="0.1"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-muted-foreground">Harga/Unit</label>
+                              <p className="text-sm font-medium text-foreground">{formatRupiah(product.price)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <label className="text-muted-foreground">Subtotal</label>
-                            <p className="font-medium text-primary">{formatRupiah(product.price * c.qty)}</p>
+                          <div className="flex justify-between items-center pt-2 border-t border-border">
+                            <span className="text-xs text-muted-foreground">Subtotal:</span>
+                            <span className="text-sm font-bold text-primary">{formatRupiah(product.price * c.qty)}</span>
                           </div>
                         </div>
                       </div>
@@ -1118,7 +1181,15 @@ export default function CashierPOS() {
           <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">Tambah Stok Produk</h3>
-              <button onClick={() => setShowAddProduct(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowStockHistory(true)}
+                  className="px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg text-sm font-medium text-foreground transition-colors"
+                >
+                  📊 Riwayat
+                </button>
+                <button onClick={() => setShowAddProduct(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+              </div>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -1184,6 +1255,70 @@ export default function CashierPOS() {
                   Batal
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Stock History Modal */}
+      {showStockHistory && (
+        <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowStockHistory(false)}>
+          <div className="bg-card rounded-2xl shadow-float w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">📊 Riwayat Penambahan Stok</h3>
+              <button onClick={() => setShowStockHistory(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6">
+              {stockHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
+                    <Package className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-muted-foreground">Belum ada riwayat penambahan stok</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stockHistory.map((entry) => (
+                    <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <h4 className="font-semibold text-foreground">{entry.productName}</h4>
+                          <p className="text-xs text-muted-foreground">Kasir: {entry.cashierName}</p>
+                          <p className="text-xs text-muted-foreground">{formatDateTime(entry.date)}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
+                            +{entry.addedStock}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Stok Sebelumnya: </span>
+                          <span className="font-medium">{entry.oldStock}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Stok Setelah: </span>
+                          <span className="font-bold text-success">{entry.newStock}</span>
+                        </div>
+                      </div>
+                      {entry.notes && (
+                        <div className="mt-2 pt-2 border-t border-border">
+                          <p className="text-xs text-muted-foreground">Catatan: {entry.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="p-6 border-t border-border">
+              <button 
+                onClick={() => setShowStockHistory(false)}
+                className="w-full py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+              >
+                Tutup
+              </button>
             </div>
           </div>
         </div>
