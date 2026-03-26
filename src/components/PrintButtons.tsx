@@ -559,24 +559,32 @@ export default function PrintButtons({
             </div>
           </div>
           
-          ${tx.paymentType ? `
-            <div class="payment">
-              <div class="info-row">
-                <span>Metode Pembayaran</span>
-                <span>${tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}</span>
-              </div>
-              ${tx.cashPaid ? `
-                <div class="info-row">
-                  <span>Tunai Dibayar</span>
-                  <span>${formatRupiah(tx.cashPaid)}</span>
-                </div>
-                <div class="info-row">
-                  <span>Kembalian</span>
-                  <span>${formatRupiah(tx.change || 0)}</span>
-                </div>
-              ` : ''}
+          <div class="payment">
+            <div class="info-row">
+              <span>Payment</span>
+              <span>${tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}</span>
             </div>
-          ` : ''}
+            ${tx.paymentType === 'cash' && (tx.cashPaid || tx.cashReceived) ? `
+              <div class="info-row">
+                <span>Tunai</span>
+                <span>${formatRupiah(tx.cashPaid || tx.cashReceived)}</span>
+              </div>
+              <div class="info-row">
+                <span>Kembali</span>
+                <span>${formatRupiah(tx.change || tx.cashChange || 0)}</span>
+              </div>
+            ` : ''}
+            ${tx.paymentType === 'credit' ? `
+              <div class="info-row">
+                <span>DP</span>
+                <span>${formatRupiah(tx.dp || 0)}</span>
+              </div>
+              <div class="info-row">
+                <span>Sisa</span>
+                <span>${formatRupiah(tx.grandTotal - (tx.dp || 0))}</span>
+              </div>
+            ` : ''}
+          </div>
           
           <div class="footer">
             <div>Terima kasih atas kunjungan Anda</div>
