@@ -490,11 +490,10 @@ export default function PrintButtons({
               font-size: ${fontSize};
             }
             .barcode { 
-              width: 45%; 
-              text-align: center;
-              border-top: 1px solid #000;
-              padding-top: 20px;
-              font-size: ${fontSize};
+              text-align: center; 
+              margin: 10px 0;
+              font-family: 'Libre Barcode 39', cursive;
+              font-size: 24px;
             }
             @media print {
               body { margin: 0; }
