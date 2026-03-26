@@ -29,7 +29,7 @@ export default function CashierPOS() {
   const [showInvoice, setShowInvoice] = useState<Transaction | null>(null);
   const [showCashierOpen, setShowCashierOpen] = useState(false);
   const [showCashierClose, setShowCashierClose] = useState(false);
-  const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'expense' | 'debt'>('dashboard');
+  const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'cart' | 'expense' | 'debt'>('dashboard');
 
   // Payment state
   const [paymentType, setPaymentType] = useState<'cash' | 'transfer' | 'credit'>('cash');
@@ -66,6 +66,25 @@ export default function CashierPOS() {
     productId: '',
     additionalStock: 0,
     notes: ''
+  });
+
+  // Cart state for kilogram sales
+  const [kgCartItems, setKgCartItems] = useState<Array<{
+    productId: string;
+    productName: string;
+    price: number;
+    quantity: number;
+    weight: number; // in kg
+    subtotal: number;
+  }>>([]);
+
+  // Add debt manual state
+  const [manualDebt, setManualDebt] = useState({
+    customerName: '',
+    customerPhone: '',
+    amount: 0,
+    description: '',
+    date: new Date().toISOString()
   });
 
   const userUnit = units.find(u => u.id === currentUser?.unitId);
@@ -157,6 +176,81 @@ export default function CashierPOS() {
     
     setShowAddProduct(false);
     toast.success(`Stok ${selectedProduct.name} berhasil ditambahkan!`);
+  };
+
+  // Cart functions for kilogram sales
+  const addToCartKg = (productId: string, weight: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    const existingItem = kgCartItems.find(item => item.productId === productId);
+    
+    if (existingItem) {
+      setKgCartItems(kgCartItems.map(item => 
+        item.productId === productId 
+          ? { 
+              ...item, 
+              weight: item.weight + weight, 
+              subtotal: (item.weight + weight) * item.price 
+            }
+          : item
+      ));
+    } else {
+      setKgCartItems([...kgCartItems, {
+        productId,
+        productName: product.name,
+        price: product.price,
+        quantity: 1,
+        weight,
+        subtotal: weight * product.price
+      }]);
+    }
+  };
+
+  const removeFromCartKg = (index: number) => {
+    setKgCartItems(kgCartItems.filter((_, i) => i !== index));
+  };
+
+  const updateCartItemWeight = (index: number, weight: number) => {
+    setKgCartItems(kgCartItems.map((item, i) => 
+      i === index 
+        ? { ...item, weight, subtotal: weight * item.price }
+        : item
+    ));
+  };
+
+  // Manual debt function
+  const handleAddManualDebt = () => {
+    if (!manualDebt.customerName.trim()) {
+      toast.error('Nama pelanggan harus diisi!');
+      return;
+    }
+    if (manualDebt.amount <= 0) {
+      toast.error('Jumlah piutang harus lebih dari 0!');
+      return;
+    }
+
+    addDebt({
+      transactionId: 'manual_' + Date.now(),
+      customerName: manualDebt.customerName,
+      customerPhone: manualDebt.customerPhone,
+      totalAmount: manualDebt.amount,
+      dpAmount: 0,
+      remainingAmount: manualDebt.amount,
+      date: manualDebt.date,
+      unitId: currentUser?.unitId || '',
+      unitName: userUnit?.name || '',
+    });
+
+    setManualDebt({
+      customerName: '',
+      customerPhone: '',
+      amount: 0,
+      description: '',
+      date: new Date().toISOString()
+    });
+
+    toast.success('Piutang manual berhasil ditambahkan!');
   };
 
   const handlePayment = () => {
@@ -338,7 +432,7 @@ export default function CashierPOS() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {['dashboard', 'cashin', 'pos', 'expense', 'debt'].map(page => {
+          {['dashboard', 'cashin', 'pos', 'cart', 'expense', 'debt'].map(page => {
             console.log('Rendering menu item:', page, 'activePage:', activePage);
             return (
               <button key={page} onClick={() => {
@@ -346,7 +440,7 @@ export default function CashierPOS() {
                 setActivePage(page as any);
               }}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-                {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
+                {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'cart' ? 'Keranjang' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
               </button>
             );
           })}
@@ -488,6 +582,137 @@ export default function CashierPOS() {
                 <DollarSign className="w-5 h-5" /> Bayar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activePage === 'cart' && (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Product Selection */}
+          <div className="flex-1 flex flex-col overflow-hidden p-4">
+            <div className="flex gap-2 mb-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input 
+                  value={searchQuery} 
+                  onChange={e => setSearchQuery(e.target.value)} 
+                  placeholder="Cari produk..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" 
+                />
+              </div>
+              <select 
+                value={selectedUnit} 
+                onChange={e => setSelectedUnit(e.target.value)}
+                className="px-3 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="">Semua Unit</option>
+                {units.filter(u => u.id === currentUser?.unitId).map(unit => (
+                  <option key={unit.id} value={unit.id}>{unit.name}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
+              {filteredProducts.map(p => {
+                const stock = getProductStock(p);
+                const inCart = kgCartItems.find(c => c.productId === p.id);
+                return (
+                  <button 
+                    key={p.id} 
+                    onClick={() => stock > 0 && addToCartKg(p.id, 1)} 
+                    disabled={stock <= 0}
+                    className={`bg-card rounded-xl p-4 text-left shadow-card hover:shadow-elevated transition-all relative ${stock <= 0 ? 'opacity-50' : 'hover:scale-[1.02]'}`}
+                  >
+                    {stock <= 5 && stock > 0 && (
+                      <div className="absolute top-2 right-2">
+                        <AlertTriangle className="w-4 h-4 text-accent" />
+                      </div>
+                    )}
+                    {inCart && (
+                      <div className="absolute top-2 left-2 w-6 h-6 rounded-full primary-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                        {inCart.weight}kg
+                      </div>
+                    )}
+                    <Package className="w-8 h-8 text-primary/30 mb-2" />
+                    <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.supplier}</p>
+                    <p className="text-sm font-bold text-primary mt-1">{formatRupiah(p.price)}/kg</p>
+                    <p className="text-xs text-muted-foreground">Stok: {stock}kg</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Cart */}
+          <div className="w-96 bg-card border-l border-border flex flex-col">
+            <div className="p-4 border-b border-border">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <ShoppingCart className="w-5 h-5" />
+                Keranjang Kilogram
+              </h3>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {cartItems.length === 0 ? (
+                <div className="text-center py-8">
+                  <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">Keranjang kosong</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cartItems.map((item, index) => (
+                    <div key={index} className="bg-background rounded-lg p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-foreground">{item.productName}</h4>
+                        <button 
+                          onClick={() => removeFromCartKg(index)}
+                          className="text-destructive hover:bg-destructive/10 p-1 rounded"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <label className="text-muted-foreground">Berat (kg)</label>
+                          <input
+                            type="number"
+                            value={item.weight}
+                            onChange={e => updateCartItemWeight(index, parseFloat(e.target.value) || 0)}
+                            className="w-full px-2 py-1 rounded border border-input bg-background text-foreground"
+                            step="0.1"
+                            min="0.1"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-muted-foreground">Subtotal</label>
+                          <p className="font-medium text-primary">{formatRupiah(item.subtotal)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {cartItems.length > 0 && (
+              <div className="p-4 border-t border-border space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total Berat:</span>
+                  <span className="font-medium">{cartItems.reduce((sum, item) => sum + item.weight, 0).toFixed(1)} kg</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg">
+                  <span>Total:</span>
+                  <span className="text-primary">{formatRupiah(cartItems.reduce((sum, item) => sum + item.subtotal, 0))}</span>
+                </div>
+                <button 
+                  onClick={() => setShowPayment(true)}
+                  className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90"
+                >
+                  Proses Pembayaran
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
