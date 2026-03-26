@@ -91,6 +91,9 @@ export default function CashierPOS() {
     cashierName: string;
   }>>([]);
 
+  // Real-time stock tracking
+  const [realTimeStock, setRealTimeStock] = useState<{[key: string]: number}>({});
+
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
 
@@ -154,16 +157,22 @@ export default function CashierPOS() {
       return;
     }
 
-    // Find the selected product
+    // Find selected product
     const selectedProduct = products.find(p => p.id === addStockProduct.productId);
     if (!selectedProduct) {
       toast.error('Produk tidak ditemukan!');
       return;
     }
 
-    // Calculate new stock
-    const oldStock = selectedProduct.stock;
-    const newStock = oldStock + addStockProduct.additionalStock;
+    // Get current stock (from real-time tracking or original)
+    const currentStock = realTimeStock[addStockProduct.productId] || selectedProduct.stock || 0;
+    const newStock = currentStock + addStockProduct.additionalStock;
+    
+    // Update real-time stock
+    setRealTimeStock(prev => ({
+      ...prev,
+      [addStockProduct.productId]: newStock
+    }));
     
     // Add to history
     const historyEntry = {
@@ -171,8 +180,8 @@ export default function CashierPOS() {
       productId: selectedProduct.id,
       productName: selectedProduct.name,
       addedStock: addStockProduct.additionalStock,
-      oldStock: oldStock || 0,
-      newStock: newStock || 0,
+      oldStock: currentStock,
+      newStock: newStock,
       notes: addStockProduct.notes,
       date: new Date().toISOString(),
       cashierName: currentUser?.name || 'Unknown'
@@ -180,10 +189,8 @@ export default function CashierPOS() {
     
     setStockHistory(prev => [historyEntry, ...prev]);
     
-    // Update the actual product stock in the context
-    // This would normally update via API/context, for now we'll simulate it
     console.log('Stock updated for product:', selectedProduct.name, {
-      oldStock: oldStock,
+      oldStock: currentStock,
       additionalStock: addStockProduct.additionalStock,
       newStock: newStock,
       notes: addStockProduct.notes
@@ -1330,7 +1337,7 @@ export default function CashierPOS() {
                 >
                   <option value="">-- Pilih Produk --</option>
                   {unitProducts.map(product => {
-                    const currentStock = getProductStock(product);
+                    const currentStock = realTimeStock[product.id] || getProductStock(product);
                     return (
                       <option key={product.id} value={product.id}>
                         {product.name} - Stok: {currentStock} {product.satuan || 'pcs'}
@@ -1368,7 +1375,7 @@ export default function CashierPOS() {
                   <p className="font-medium text-foreground mb-2">Informasi Produk:</p>
                   {(() => {
                     const selectedProduct = products.find(p => p.id === addStockProduct.productId);
-                    const currentStock = selectedProduct ? getProductStock(selectedProduct) : 0;
+                    const currentStock = selectedProduct ? (realTimeStock[addStockProduct.productId] || getProductStock(selectedProduct)) : 0;
                     return selectedProduct ? (
                       <>
                         <div className="grid grid-cols-2 gap-2 mb-2">
@@ -1453,8 +1460,7 @@ export default function CashierPOS() {
               ) : (
                 <div className="space-y-3">
                   {stockHistory.map((entry) => {
-                    const product = products.find(p => p.id === entry.productId);
-                    const currentStock = product ? getProductStock(product) : 0;
+                    const currentStock = realTimeStock[entry.productId] || getProductStock(products.find(p => p.id === entry.productId));
                     return (
                       <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
                         <div className="flex justify-between items-start mb-2">
@@ -1472,11 +1478,11 @@ export default function CashierPOS() {
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
                             <span className="text-muted-foreground">Stok Sebelumnya: </span>
-                            <span className="font-medium">{entry.oldStock}</span>
+                            <span className="font-medium">{entry.oldStock || 0}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Stok Setelah: </span>
-                            <span className="font-bold text-success">{entry.newStock}</span>
+                            <span className="font-bold text-success">{entry.newStock || 0}</span>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm mt-2">
@@ -1486,7 +1492,7 @@ export default function CashierPOS() {
                           </div>
                           <div>
                             <span className="text-muted-foreground">Satuan: </span>
-                            <span className="font-medium">{product?.satuan || 'pcs'}</span>
+                            <span className="font-medium">{products.find(p => p.id === entry.productId)?.satuan || 'pcs'}</span>
                           </div>
                         </div>
                         {entry.notes && (
