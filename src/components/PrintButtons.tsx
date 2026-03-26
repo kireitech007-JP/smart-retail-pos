@@ -486,7 +486,7 @@ export default function PrintButtons({
         </head>
         <body>
           <div class="header">
-            <div class="title">FAKTUR - ${tx.id.slice(-6).toUpperCase()}</div>
+            <div class="title">FAKTUR</div>
             <div class="subtitle">SMART RETAIL POS</div>
             <div class="subtitle">Jl. Contoh No. 123, Jakarta</div>
             <div class="subtitle">Telp: (021) 1234-5678</div>
