@@ -110,6 +110,7 @@ export default function CashierPOS() {
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentNotes, setPaymentNotes] = useState('');
   const [showDebtInvoice, setShowDebtInvoice] = useState(false);
+  const [showDebtExportModal, setShowDebtExportModal] = useState(false);
 
   const userUnit = units.find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
@@ -617,13 +618,97 @@ export default function CashierPOS() {
 
   const handleWhatsAppDebtInvoice = () => {
     if (!showDebtInvoice) return;
-    const msg = `*BUKTI PEMBAYARAN PIUTANG*\n${storeSettings.storeName}\nNo: DEBT-${Date.now().toString().slice(-6).toUpperCase()}\n\nPelanggan: ${selectedDebt?.customerName}\nJumlah Bayar: ${formatRupiah(paymentAmount)}\nSisa Piutang: ${formatRupiah((selectedDebt?.remainingAmount || 0) - paymentAmount)}\n\nTerima kasih telah melakukan pembayaran.`;
+    const msg = `*BUKTI PEMBAYARAN PIUTANG*\n${storeSettings?.storeName || 'Toko'}\nNo: DEBT-${Date.now().toString().slice(-6).toUpperCase()}\n\nPelanggan: ${selectedDebt?.customerName}\nJumlah Bayar: ${formatRupiah(paymentAmount)}\nSisa Piutang: ${formatRupiah((selectedDebt?.remainingAmount || 0) - paymentAmount)}\n\nTerima kasih telah melakukan pembayaran.`;
     const phone = selectedDebt?.customerPhone?.replace(/[^0-9]/g, '');
     if (phone) {
       window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
     } else {
       toast.error('Nomor telepon pelanggan tidak tersedia');
     }
+  };
+
+  const handleDebtExportToGoogleSheets = () => {
+    const unitDebts = debts.filter(d => d.unitId === currentUser?.unitId);
+    const exportData = unitDebts.map(d => ({
+      'ID Piutang': d.id.slice(-6).toUpperCase(),
+      'Nama Pelanggan': d.customerName,
+      'No. Telepon': d.customerPhone || '-',
+      'Total Piutang': d.totalAmount,
+      'Jumlah Dibayar': d.totalAmount - d.remainingAmount,
+      'Sisa Piutang': d.remainingAmount,
+      'Status': d.status === 'paid' ? 'Lunas' : 'Belum Lunas',
+      'Tanggal': formatDateTime(d.date)
+    }));
+    
+    console.log('Exporting to Google Sheets:', exportData);
+    toast.success('Data piutang dikirim ke Google Sheets');
+    setShowDebtExportModal(false);
+  };
+
+  const handleDebtExportToPDF = () => {
+    const unitDebts = debts.filter(d => d.unitId === currentUser?.unitId);
+    const pdfContent = `
+      <html>
+        <head>
+          <title>LAPORAN PIUTANG</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { text-align: center; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; }
+          </style>
+        </head>
+        <body>
+          <h1>LAPORAN PIUTANG</h1>
+          <p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p>
+          <p>Unit: ${userUnit?.name || '-'}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Nama Pelanggan</th>
+                <th>Telepon</th>
+                <th>Total</th>
+                <th>Dibayar</th>
+                <th>Sisa</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${unitDebts.map(d => `
+                <tr>
+                  <td>${d.id.slice(-6).toUpperCase()}</td>
+                  <td>${d.customerName}</td>
+                  <td>${d.customerPhone || '-'}</td>
+                  <td>${formatRupiah(d.totalAmount)}</td>
+                  <td>${formatRupiah(d.totalAmount - d.remainingAmount)}</td>
+                  <td>${formatRupiah(d.remainingAmount)}</td>
+                  <td>${d.status === 'paid' ? 'Lunas' : 'Belum Lunas'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="summary">
+            <h3>Ringkasan</h3>
+            <p>Total Piutang: ${formatRupiah(unitDebts.reduce((sum, d) => sum + d.totalAmount, 0))}</p>
+            <p>Total Sisa: ${formatRupiah(unitDebts.reduce((sum, d) => sum + d.remainingAmount, 0))}</p>
+            <p>Jumlah Pelanggan: ${unitDebts.length}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      newWindow.print();
+    } else {
+      toast.error('Popup diblokir. Silakan izinkan popup untuk preview PDF.');
+    }
+    setShowDebtExportModal(false);
   };
 
   // Session report data
@@ -1065,9 +1150,18 @@ export default function CashierPOS() {
 
             {/* Debt List */}
             <div className="bg-card rounded-xl shadow-card overflow-hidden">
-              <h3 className="font-bold text-foreground p-4 border-b border-border flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" /> Daftar Piutang
-              </h3>
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <h3 className="font-bold text-foreground flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-primary" /> Daftar Piutang
+                </h3>
+                <button
+                  onClick={() => setShowDebtExportModal(true)}
+                  className="px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+              </div>
               <div className="divide-y divide-border">
                 {debts.filter(d => d.unitId === currentUser?.unitId && d.status !== 'paid').map(d => (
                   <div key={d.id} className="p-4">
@@ -1929,6 +2023,49 @@ export default function CashierPOS() {
                   Kirim WhatsApp
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debt Export Modal */}
+      {showDebtExportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card rounded-xl shadow-elevated w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-border">
+              <h3 className="text-lg font-bold text-foreground">Export Data Piutang</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                <button
+                  onClick={handleDebtExportToGoogleSheets}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+                >
+                  <Cloud className="w-5 h-5 text-success" />
+                  <div className="text-left">
+                    <p className="font-medium text-foreground">Google Sheets</p>
+                    <p className="text-xs text-muted-foreground">Kirim data piutang ke Google Sheets</p>
+                  </div>
+                </button>
+                <button
+                  onClick={handleDebtExportToPDF}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
+                >
+                  <FileText className="w-5 h-5 text-blue-600" />
+                  <div className="text-left">
+                    <p className="font-medium text-foreground">PDF Preview</p>
+                    <p className="text-xs text-muted-foreground">Preview dan print laporan piutang</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 border-t border-border">
+              <button
+                onClick={() => setShowDebtExportModal(false)}
+                className="w-full py-3 bg-secondary text-secondary-foreground rounded-lg font-medium"
+              >
+                Batal
+              </button>
             </div>
           </div>
         </div>

@@ -66,7 +66,11 @@ export default function CashierDashboard() {
                 <tr>
                   <td>${tx.id.slice(-6).toUpperCase()}</td>
                   <td>${formatDateTime(tx.date)}</td>
-                  <td>${tx.description}</td>
+                  <td>${tx.type === 'transaction' ? `Penjualan ${tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'} - ${tx.customerName || 'Umum'}` : 
+                   tx.type === 'cashin' ? `Kas Masuk - ${tx.depositorName || 'Tidak diketahui'}` : 
+                   tx.type === 'expense' ? `Pengeluaran - ${tx.details || 'Tidak diketahui'}` : 
+                   tx.type === 'debt_payment' ? `Pelunasan Piutang - ${tx.customerName || 'Tidak diketahui'}` : 
+                   'Lainnya'}</td>
                   <td>${tx.type === 'transaction' ? 'Transaksi' : tx.type === 'cashin' ? 'Kas Masuk' : tx.type === 'expense' ? 'Pengeluaran' : 'Lainnya'}</td>
                   <td>${formatRupiah(Math.abs(tx.amount))}</td>
                 </tr>
@@ -605,19 +609,30 @@ export default function CashierDashboard() {
                 <div className="space-y-2">
                   <div className="grid grid-cols-2 gap-2">
                     <p className="text-sm text-muted-foreground">Pelanggan:</p>
-                    <p className="text-sm font-medium text-foreground">{selectedTransaction.customerName || 'Umum'}</p>
+                    <p className="text-sm font-medium text-foreground">{selectedTransaction.customerName || selectedTransaction.depositorName || 'Umum'}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <p className="text-sm text-muted-foreground">Metode Pembayaran:</p>
+                    <p className="text-sm text-muted-foreground">Jenis:</p>
                     <p className="text-sm font-medium text-foreground">
-                      {selectedTransaction.paymentType === 'cash' ? 'Tunai' : 
-                       selectedTransaction.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
+                      {selectedTransaction.type === 'transaction' ? 'Penjualan' : 
+                       selectedTransaction.type === 'cashin' ? 'Kas Masuk' : 
+                       selectedTransaction.type === 'expense' ? 'Pengeluaran' : 
+                       selectedTransaction.type === 'debt_payment' ? 'Pelunasan Piutang' : 'Lainnya'}
                     </p>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <p className="text-sm text-muted-foreground">Total:</p>
-                    <p className="text-sm font-bold text-success">{formatRupiah(selectedTransaction.grandTotal)}</p>
+                    <p className="text-sm text-muted-foreground">Jumlah:</p>
+                    <p className="text-sm font-bold text-success">{formatRupiah(Math.abs(selectedTransaction.amount || selectedTransaction.grandTotal || 0))}</p>
                   </div>
+                  {selectedTransaction.paymentType && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <p className="text-sm text-muted-foreground">Metode:</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {selectedTransaction.paymentType === 'cash' ? 'Tunai' : 
+                         selectedTransaction.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
+                      </p>
+                    </div>
+                  )}
                   {selectedTransaction.dp && selectedTransaction.dp < selectedTransaction.grandTotal && (
                     <>
                       <div className="grid grid-cols-2 gap-2">
@@ -634,14 +649,23 @@ export default function CashierDashboard() {
               </div>
               
               <div className="flex gap-2 mb-4">
-                <PrintButtons 
-                  transaction={selectedTransaction}
-                  type="invoice"
-                />
-                <PrintButtons 
-                  transaction={selectedTransaction}
-                  type="faktur"
-                />
+                {selectedTransaction.type === 'transaction' && (
+                  <>
+                    <PrintButtons 
+                      transaction={selectedTransaction}
+                      type="invoice"
+                    />
+                    <PrintButtons 
+                      transaction={selectedTransaction}
+                      type="faktur"
+                    />
+                  </>
+                )}
+                {selectedTransaction.type !== 'transaction' && (
+                  <div className="flex-1 p-4 bg-muted/30 rounded-lg text-center text-muted-foreground">
+                    <p className="text-sm">Hanya transaksi penjualan yang dapat dicetak invoice/faktur</p>
+                  </div>
+                )}
               </div>
             </div>
             <div className="p-6 border-t border-border">
