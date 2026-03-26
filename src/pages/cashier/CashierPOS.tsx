@@ -1899,18 +1899,32 @@ export default function CashierPOS() {
                   }}
                   type="invoice"
                 />
+                <PrintButtons 
+                  transaction={{
+                    id: 'DEBT_' + Date.now(),
+                    date: new Date().toISOString(),
+                    customerName: selectedDebt?.customerName,
+                    customerPhone: selectedDebt?.customerPhone,
+                    grandTotal: paymentAmount,
+                    paymentType: 'cash',
+                    items: [],
+                    cashierName: currentUser?.name,
+                    type: 'debt_payment'
+                  }}
+                  type="faktur"
+                />
               </div>
               
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowDebtInvoice(false)}
-                  className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
+                  className="py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
                 >
                   Tutup
                 </button>
                 <button
                   onClick={handleWhatsAppDebtInvoice}
-                  className="flex-1 py-3 bg-success text-success-foreground rounded-lg font-medium hover:bg-success/90 transition-colors"
+                  className="py-3 bg-success text-success-foreground rounded-lg font-medium hover:bg-success/90 transition-colors"
                 >
                   Kirim WhatsApp
                 </button>

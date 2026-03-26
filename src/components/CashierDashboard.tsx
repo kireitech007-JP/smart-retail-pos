@@ -14,7 +14,7 @@ export default function CashierDashboard() {
   const { 
     currentUser, units, transactions, expenses, debts, payDebt, 
     openCashierSession, closeCashierSession, getActiveSession, cashierSessions,
-    cashIns, getProductStock, products
+    cashIns, getProductStock, products, storeSettings
   } = useApp();
 
   const [openingCash, setOpeningCash] = useState(0);
@@ -34,8 +34,63 @@ export default function CashierDashboard() {
   };
 
   const handleExportToPDF = () => {
-    // Export logic here
-    toast.success('PDF berhasil diunduh');
+    // Create PDF content from filtered transactions
+    const pdfContent = `
+      <html>
+        <head>
+          <title>LAPORAN TRANSAKSI</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { text-align: center; color: #333; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; font-weight: bold; }
+            .summary { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; }
+          </style>
+        </head>
+        <body>
+          <h1>LAPORAN TRANSAKSI</h1>
+          <p>Tanggal: ${new Date().toLocaleDateString('id-ID')}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Waktu</th>
+                <th>Deskripsi</th>
+                <th>Jenis</th>
+                <th>Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filteredTransactions.map(tx => `
+                <tr>
+                  <td>${tx.id.slice(-6).toUpperCase()}</td>
+                  <td>${formatDateTime(tx.date)}</td>
+                  <td>${tx.description}</td>
+                  <td>${tx.type === 'transaction' ? 'Transaksi' : tx.type === 'cashin' ? 'Kas Masuk' : tx.type === 'expense' ? 'Pengeluaran' : 'Lainnya'}</td>
+                  <td>${formatRupiah(Math.abs(tx.amount))}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          <div class="summary">
+            <h3>Ringkasan</h3>
+            <p>Total Transaksi: ${filteredTransactions.length}</p>
+            <p>Total Jumlah: ${formatRupiah(filteredTransactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0))}</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Open in new window for preview
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(pdfContent);
+      newWindow.document.close();
+      newWindow.print();
+    } else {
+      toast.error('Popup diblokir. Silakan izinkan popup untuk preview PDF.');
+    }
   };
 
   const handlePrintInvoice = (transaction: any) => {
@@ -532,21 +587,84 @@ export default function CashierDashboard() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-card rounded-xl shadow-elevated w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
             <div className="p-6 border-b border-border">
-              <h3 className="text-lg font-bold text-foreground">Invoice Transaksi</h3>
+              <h3 className="text-lg font-bold text-foreground">Invoice & Faktur Transaksi</h3>
             </div>
             <div className="p-6">
-              <PrintButtons 
-                transaction={selectedTransaction}
-                type="invoice"
-              />
+              <div className="bg-muted/50 rounded-lg p-4 mb-4">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">No. Invoice:</p>
+                    <p className="font-bold text-foreground">{selectedTransaction.id.slice(-6).toUpperCase()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Tanggal:</p>
+                    <p className="font-bold text-foreground">{formatDateTime(selectedTransaction.date)}</p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-sm text-muted-foreground">Pelanggan:</p>
+                    <p className="text-sm font-medium text-foreground">{selectedTransaction.customerName || 'Umum'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-sm text-muted-foreground">Metode Pembayaran:</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {selectedTransaction.paymentType === 'cash' ? 'Tunai' : 
+                       selectedTransaction.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <p className="text-sm text-muted-foreground">Total:</p>
+                    <p className="text-sm font-bold text-success">{formatRupiah(selectedTransaction.grandTotal)}</p>
+                  </div>
+                  {selectedTransaction.dp && selectedTransaction.dp < selectedTransaction.grandTotal && (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm text-muted-foreground">DP:</p>
+                        <p className="text-sm font-medium text-foreground">{formatRupiah(selectedTransaction.dp)}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <p className="text-sm text-muted-foreground">Sisa:</p>
+                        <p className="text-sm font-bold text-accent">{formatRupiah(selectedTransaction.grandTotal - selectedTransaction.dp)}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mb-4">
+                <PrintButtons 
+                  transaction={selectedTransaction}
+                  type="invoice"
+                />
+                <PrintButtons 
+                  transaction={selectedTransaction}
+                  type="faktur"
+                />
+              </div>
             </div>
             <div className="p-6 border-t border-border">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   onClick={() => setShowInvoice(false)}
-                  className="flex-1 py-2 bg-secondary text-secondary-foreground rounded-lg font-medium"
+                  className="py-2 bg-secondary text-secondary-foreground rounded-lg font-medium"
                 >
                   Tutup
+                </button>
+                <button
+                  onClick={() => {
+                    const msg = `*INVOICE*\n${storeSettings?.storeName || 'Toko'}\nNo: ${selectedTransaction.id.slice(-6).toUpperCase()}\nPelanggan: ${selectedTransaction.customerName || 'Umum'}\nTotal: ${formatRupiah(selectedTransaction.grandTotal)}\nMetode: ${selectedTransaction.paymentType === 'cash' ? 'Tunai' : selectedTransaction.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}\n\nTerima kasih!`;
+                    const phone = selectedTransaction.customerPhone?.replace(/[^0-9]/g, '');
+                    if (phone) {
+                      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+                    } else {
+                      toast.error('Nomor telepon tidak tersedia');
+                    }
+                  }}
+                  className="py-2 bg-success text-success-foreground rounded-lg font-medium hover:bg-success/90 transition-colors"
+                >
+                  Kirim WhatsApp
                 </button>
               </div>
             </div>
