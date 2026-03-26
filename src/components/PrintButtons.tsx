@@ -123,7 +123,11 @@ export default function PrintButtons({
               margin: 2px 0;
             }
             .info { 
-              margin: 10px 0;
+              margin: 15px 0;
+              padding: 10px;
+              border: 1px solid #ddd;
+              border-radius: 5px;
+              background: #f9f9f9;
               font-size: ${fontSize};
             }
             .info-row { 
@@ -133,9 +137,10 @@ export default function PrintButtons({
             }
             .items { 
               margin: 15px 0;
-              border-top: 1px dashed #000;
-              border-bottom: 1px dashed #000;
               padding: 10px 0;
+              border-top: 2px solid #000;
+              border-bottom: 2px solid #000;
+              background: #fff;
             }
             .item-row { 
               display: flex; 
