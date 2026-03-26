@@ -735,12 +735,6 @@ export default function CashierPOS() {
     return reportData;
   }, [activeSession, currentUser, units, sessionTx, sessionCashIn, sessionExp, sessionSales, sessionCashInTotal, sessionExpTotal, debts]);
 
-  const getProductStock = (product: Product) => {
-    const realTime = realTimeStock[product.id];
-    if (realTime !== undefined) return realTime;
-    return product.initialStock + product.addedStock - product.soldStock;
-  };
-
   if (!activeSession && !['dashboard', 'cashin'].includes(activePage)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -1475,7 +1469,13 @@ export default function CashierPOS() {
                       .filter(row => row['Tipe'] === 'Pelunasan Piutang')
                       .reduce((sum, row) => sum + (row['Jumlah'] || 0), 0),
                     finalBalance: activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
-                    transactionCount: sessionTx.length
+                    transactionCount: sessionTx.length,
+                    // Add sales breakdown
+                    cashSales: sessionTx.filter(t => t.paymentType === 'cash').reduce((sum, t) => sum + t.grandTotal, 0),
+                    transferSales: sessionTx.filter(t => t.paymentType === 'transfer').reduce((sum, t) => sum + t.grandTotal, 0),
+                    creditSales: sessionTx.filter(t => t.paymentType === 'credit').reduce((sum, t) => sum + t.grandTotal, 0),
+                    dpPayments: sessionTx.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.dp || 0), 0),
+                    remainingCredit: sessionTx.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.grandTotal - (t.dp || 0)), 0)
                   }}
                   sessionTransactions={sessionReportData}
                   type="session"
