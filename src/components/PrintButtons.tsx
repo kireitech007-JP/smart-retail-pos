@@ -169,6 +169,10 @@ export default function PrintButtons({
               width: 60px;
               text-align: right;
             }
+            .item-header-total {
+              width: 70px;
+              text-align: right;
+            }
             .no-items {
               text-align: center;
               color: #666;
@@ -191,6 +195,10 @@ export default function PrintButtons({
             }
             .item-price { 
               width: 60px; 
+              text-align: right;
+            }
+            .item-total { 
+              width: 70px; 
               text-align: right;
             }
             .total { 
@@ -256,6 +264,10 @@ export default function PrintButtons({
               <span>Pelanggan</span>
               <span>${tx.customerName || 'Umum'}</span>
             </div>
+            <div class="info-row">
+              <span>No. HP</span>
+              <span>${tx.customerPhone || '-'}</span>
+            </div>
           </div>
           
           <div class="items">
@@ -263,12 +275,14 @@ export default function PrintButtons({
               <div class="item-header-name">Produk</div>
               <div class="item-header-qty">Qty</div>
               <div class="item-header-price">Harga</div>
+              <div class="item-header-total">Total</div>
             </div>
             ${tx.items && tx.items.length > 0 ? tx.items.map(item => `
               <div class="item-row">
                 <div class="item-name">${item.productName}</div>
                 <div class="item-qty">${item.qty}</div>
                 <div class="item-price">${formatRupiah(item.price)}</div>
+                <div class="item-total">${formatRupiah(item.price * item.qty)}</div>
               </div>
             `).join('') : '<div class="no-items">Tidak ada item</div>'}
           </div>
@@ -431,6 +445,10 @@ export default function PrintButtons({
               width: 60px;
               text-align: right;
             }
+            .item-header-total {
+              width: 70px;
+              text-align: right;
+            }
             .no-items {
               text-align: center;
               color: #666;
@@ -453,6 +471,10 @@ export default function PrintButtons({
             }
             .item-price { 
               width: 60px; 
+              text-align: right;
+            }
+            .item-total { 
+              width: 70px; 
               text-align: right;
             }
             .total { 
