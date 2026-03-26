@@ -171,8 +171,8 @@ export default function CashierPOS() {
       productId: selectedProduct.id,
       productName: selectedProduct.name,
       addedStock: addStockProduct.additionalStock,
-      oldStock: oldStock,
-      newStock: newStock,
+      oldStock: oldStock || 0,
+      newStock: newStock || 0,
       notes: addStockProduct.notes,
       date: new Date().toISOString(),
       cashierName: currentUser?.name || 'Unknown'
@@ -441,9 +441,9 @@ export default function CashierPOS() {
                   <td>${formatDateTime(entry.date)}</td>
                   <td>${entry.cashierName}</td>
                   <td>${entry.productName}</td>
-                  <td class="text-right">${entry.oldStock}</td>
+                  <td class="text-right">${entry.oldStock || 0}</td>
                   <td class="text-right">+${entry.addedStock}</td>
-                  <td class="text-right"><strong>${entry.newStock}</strong></td>
+                  <td class="text-right"><strong>${entry.newStock || 0}</strong></td>
                   <td>${entry.notes || '-'}</td>
                 </tr>
               `).join('')}
@@ -451,9 +451,9 @@ export default function CashierPOS() {
             <tfoot>
               <tr class="total-row">
                 <td colspan="4"><strong>TOTAL</strong></td>
-                <td class="text-right"><strong>${stockHistory.reduce((sum, entry) => sum + entry.oldStock, 0)}</strong></td>
+                <td class="text-right"><strong>${stockHistory.reduce((sum, entry) => sum + (entry.oldStock || 0), 0)}</strong></td>
                 <td class="text-right"><strong>+${stockHistory.reduce((sum, entry) => sum + entry.addedStock, 0)}</strong></td>
-                <td class="text-right"><strong>${stockHistory.reduce((sum, entry) => sum + entry.newStock, 0)}</strong></td>
+                <td class="text-right"><strong>${stockHistory.reduce((sum, entry) => sum + (entry.newStock || 0), 0)}</strong></td>
                 <td>-</td>
               </tr>
             </tfoot>
@@ -466,15 +466,20 @@ export default function CashierPOS() {
       </html>
     `;
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `riwayat-stok-${new Date().toISOString().split('T')[0]}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    toast.success('Riwayat stok berhasil diexport ke PDF');
+    // Open in new tab for preview
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(htmlContent);
+      newWindow.document.close();
+      newWindow.document.title = `Riwayat Stok - ${new Date().toISOString().split('T')[0]}`;
+      
+      // Auto print after content loads
+      setTimeout(() => {
+        newWindow.print();
+      }, 500);
+    }
+
+    toast.success('Preview PDF dibuka di browser baru');
   };
 
   // Session report data
