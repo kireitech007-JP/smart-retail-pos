@@ -113,6 +113,61 @@ export default function AdminSettings() {
     }
   };
 
+  // Supabase functions
+  const handleBackupAllToSupabase = async () => {
+    setIsLoading(true);
+    try {
+      const backupData = {
+        kategori,
+        satuan,
+        produk,
+        pengguna,
+        unit,
+        transaksi: transactions,
+        transaksiItems: transactions.flatMap(tx => tx.items || []),
+        piutang: debts,
+        kasMasuk,
+        pengeluaran,
+        laporan: [],
+        sessions
+      };
+      await backupAllDataToSupabase(backupData);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRestoreAllFromSupabase = async () => {
+    if (!confirm('Apakah Anda yakin ingin restore semua data dari Supabase Cloud? Data yang ada akan ditimpat!')) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      await restoreAllDataFromSupabase();
+      toast.success('Data berhasil di-restore dari Supabase Cloud. Silakan refresh halaman.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTestSupabaseConnection = async () => {
+    setIsLoading(true);
+    try {
+      await testSupabaseConnection();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleBackupIndividualToSupabase = async (type: string, data: any[], backupFn: any) => {
+    setIsLoading(true);
+    try {
+      await backupFn(data);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in max-w-2xl">
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
@@ -155,6 +210,30 @@ export default function AdminSettings() {
 
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
         <div className="flex items-center gap-2 p-6 border-b border-border">
+          <Cloud className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-foreground">Integrasi Supabase Cloud</h3>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">Supabase URL</label>
+            <input value={form.supabaseUrl} onChange={e => setForm(f => ({ ...f, supabaseUrl: e.target.value }))} 
+              placeholder="https://your-project.supabase.co"
+              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+            <p className="text-xs text-muted-foreground mt-2">URL project Supabase Anda</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">Supabase API Key</label>
+            <input value={form.supabaseKey} onChange={e => setForm(f => ({ ...f, supabaseKey: e.target.value }))} 
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              type="password"
+              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+            <p className="text-xs text-muted-foreground mt-2">API Key anonim dari project Supabase</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-card rounded-xl shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 p-6 border-b border-border">
           <Mail className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-foreground">Integrasi Email</h3>
         </div>
@@ -167,51 +246,39 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      <button onClick={handleSave} className="flex items-center gap-2 px-6 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
-        <Save className="w-5 h-5" /> Simpan Pengaturan
-      </button>
-
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
         <div className="flex items-center gap-2 p-6 border-b border-border">
-          <Database className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-foreground">Backup & Restore Google Sheets</h3>
+          <Cloud className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-foreground">Backup & Restore Supabase Cloud</h3>
         </div>
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button 
-              onClick={handleBackupAll} 
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              {isLoading ? 'Membackup...' : 'Backup Semua Data'}
-            </button>
-            <button 
-              onClick={handleRestoreAll} 
+              onClick={handleBackupAllToSupabase} 
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 transition-colors"
             >
-              <Upload className="w-4 h-4" />
-              {isLoading ? 'Mengembalikan...' : 'Restore Semua Data'}
+              <Cloud className="w-4 h-4" />
+              {isLoading ? 'Mengirim...' : 'Kirim ke Cloud'}
+            </button>
+            <button 
+              onClick={handleRestoreAllFromSupabase} 
+              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors"
+            >
+              <CloudOff className="w-4 h-4" />
+              {isLoading ? 'Mengambil...' : 'Tarik dari Cloud'}
             </button>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button 
-              onClick={handleTestConnection} 
+              onClick={handleTestSupabaseConnection} 
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-3 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50 transition-colors"
             >
               <TestTube className="w-4 h-4" />
-              {isLoading ? 'Menguji...' : 'Test Koneksi'}
-            </button>
-            <button 
-              onClick={handleClearData} 
-              disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-3 bg-red-500 text-white rounded-lg font-medium hover:bg-red-600 disabled:opacity-50 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              {isLoading ? 'Menghapus...' : 'Hapus Data Sheets'}
+              {isLoading ? 'Menguji...' : 'Test Koneksi Cloud'}
             </button>
           </div>
         </div>
@@ -219,94 +286,98 @@ export default function AdminSettings() {
 
       <div className="bg-card rounded-xl shadow-card overflow-hidden">
         <div className="flex items-center gap-2 p-6 border-b border-border">
-          <Database className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-foreground">Backup Data Individual</h3>
+          <Cloud className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-foreground">Backup Cloud Individual</h3>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <button 
-              onClick={() => handleBackupIndividual('kategori', kategori, backupKategori)} 
+              onClick={() => handleBackupIndividualToSupabase('kategori', kategori, backupKategoriToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Kategori
             </button>
             <button 
-              onClick={() => handleBackupIndividual('satuan', satuan, backupSatuan)} 
+              onClick={() => handleBackupIndividualToSupabase('satuan', satuan, backupSatuanToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Satuan
             </button>
             <button 
-              onClick={() => handleBackupIndividual('produk', produk, backupProduk)} 
+              onClick={() => handleBackupIndividualToSupabase('produk', produk, backupProdukToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Produk
             </button>
             <button 
-              onClick={() => handleBackupIndividual('pengguna', pengguna, backupPengguna)} 
+              onClick={() => handleBackupIndividualToSupabase('pengguna', pengguna, backupPenggunaToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Pengguna
             </button>
             <button 
-              onClick={() => handleBackupIndividual('unit', unit, backupUnit)} 
+              onClick={() => handleBackupIndividualToSupabase('unit', unit, backupUnitToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Unit
             </button>
             <button 
-              onClick={() => handleBackupIndividual('transaksi', transactions, backupTransaksi)} 
+              onClick={() => handleBackupIndividualToSupabase('transaksi', transactions, backupTransaksiToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Transaksi
             </button>
             <button 
-              onClick={() => handleBackupIndividual('piutang', debts, backupPiutang)} 
+              onClick={() => handleBackupIndividualToSupabase('piutang', debts, backupPiutangToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Piutang
             </button>
             <button 
-              onClick={() => handleBackupIndividual('kasMasuk', kasMasuk, backupKasMasuk)} 
+              onClick={() => handleBackupIndividualToSupabase('kasMasuk', kasMasuk, backupKasMasukToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Kas Masuk
             </button>
             <button 
-              onClick={() => handleBackupIndividual('pengeluaran', pengeluaran, backupPengeluaran)} 
+              onClick={() => handleBackupIndividualToSupabase('pengeluaran', pengeluaran, backupPengeluaranToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Pengeluaran
             </button>
             <button 
-              onClick={() => handleBackupIndividual('sessions', sessions, backupSessions)} 
+              onClick={() => handleBackupIndividualToSupabase('sessions', sessions, backupSessionsToSupabase)} 
               disabled={isLoading}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 disabled:opacity-50 transition-colors text-sm"
+              className="flex items-center gap-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 disabled:opacity-50 transition-colors text-sm"
             >
-              <Download className="w-3 h-3" />
+              <Cloud className="w-3 h-3" />
               Sessions
             </button>
           </div>
         </div>
       </div>
+
+      <button onClick={handleSave} className="flex items-center gap-2 px-6 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
+        <Save className="w-5 h-5" /> Simpan Pengaturan
+      </button>
     </div>
   );
 }
