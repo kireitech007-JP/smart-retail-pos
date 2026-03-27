@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Settings, Store, Link, Mail, Save, Download, Upload, Database, TestTube, Trash2 } from 'lucide-react';
+import { Settings, Store, Link, Mail, Save, Download, Upload, Database, TestTube, Trash2, Cloud, CloudOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
   backupAllData, 
@@ -20,6 +20,22 @@ import {
   backupLaporan,
   backupSessions
 } from '@/lib/googleSheets';
+import {
+  backupAllDataToSupabase,
+  restoreAllDataFromSupabase,
+  testSupabaseConnection,
+  backupKategoriToSupabase,
+  backupSatuanToSupabase,
+  backupProdukToSupabase,
+  backupPenggunaToSupabase,
+  backupUnitToSupabase,
+  backupTransaksiToSupabase,
+  backupTransaksiItemsToSupabase,
+  backupPiutangToSupabase,
+  backupKasMasukToSupabase,
+  backupPengeluaranToSupabase,
+  backupSessionsToSupabase
+} from '@/lib/supabaseBackup';
 
 export default function AdminSettings() {
   const { storeSettings, updateStoreSettings, kategori, satuan, produk, pengguna, unit, transactions, debts, kasMasuk, pengeluaran, sessions } = useApp();
