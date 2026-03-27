@@ -269,7 +269,6 @@ export default function AdminSettings() {
               onClick={handleBackupAllToSupabase} 
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-3 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 disabled:opacity-50 transition-colors"
-              style={{ display: 'flex', visibility: 'visible' }}
             >
               <Cloud className="w-4 h-4" />
               {isLoading ? 'Mengirim...' : 'Kirim ke Cloud'}
@@ -278,7 +277,6 @@ export default function AdminSettings() {
               onClick={handleRestoreAllFromSupabase} 
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50 transition-colors"
-              style={{ display: 'flex', visibility: 'visible' }}
             >
               <CloudOff className="w-4 h-4" />
               {isLoading ? 'Mengambil...' : 'Tarik dari Cloud'}
@@ -290,7 +288,6 @@ export default function AdminSettings() {
               onClick={handleTestSupabaseConnection} 
               disabled={isLoading}
               className="flex items-center gap-2 px-4 py-3 bg-purple-500 text-white rounded-lg font-medium hover:bg-purple-600 disabled:opacity-50 transition-colors"
-              style={{ display: 'flex', visibility: 'visible' }}
             >
               <TestTube className="w-4 h-4" />
               {isLoading ? 'Menguji...' : 'Test Koneksi Cloud'}
