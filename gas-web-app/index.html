@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Retail POS - Google Apps Script</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #64748b;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --background: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--success);
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status.loading {
+            background: var(--warning);
+        }
+
+        .status.error {
+            background: var(--danger);
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: var(--card);
+            border-radius: 12px;
+            padding: 8px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            overflow-x: auto;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .nav-tab:hover {
+            background: var(--background);
+        }
+
+        .nav-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .grid-cols-1 { grid-template-columns: 1fr; }
+        .grid-cols-2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+        .grid-cols-3 { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .table th,
+        .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table th {
+            background: var(--background);
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .table tbody tr:hover {
+            background: var(--background);
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .badge-warning {
+            background: var(--warning);
+            color: white;
+        }
+
+        .badge-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-success {
+            background: #10b98120;
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .alert-warning {
+            background: #f59e0b20;
+            color: var(--warning);
+            border: 1px solid var(--warning);
+        }
+
+        .alert-danger {
+            background: #ef444420;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .nav-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+            }
+
+            .grid-cols-2,
+            .grid-cols-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">
+                <div class="logo-icon">🏪</div>
+                <span>Smart Retail POS</span>
+            </div>
+            <div class="status" id="connectionStatus">
+                <span class="loading-spinner"></span>
+                <span>Menghubungkan...</span>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+            <button class="nav-tab" onclick="showTab('products')">📦 Produk</button>
+            <button class="nav-tab" onclick="showTab('transactions')">💳 Transaksi</button>
+            <button class="nav-tab" onclick="showTab('customers')">👥 Pelanggan</button>
+            <button class="nav-tab" onclick="showTab('reports')">📈 Laporan</button>
+            <button class="nav-tab" onclick="showTab('settings')">⚙️ Settings</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalProducts">0</div>
+                    <div class="stat-label">Total Produk</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalTransactions">0</div>
+                    <div class="stat-label">Transaksi Hari Ini</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRevenue">Rp 0</div>
+                    <div class="stat-label">Pendapatan Hari Ini</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalCustomers">0</div>
+                    <div class="stat-label">Total Pelanggan</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📊 Aktivitas Terkini</h3>
+                    <button class="btn btn-primary" onclick="refreshDashboard()">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="recentActivity">
+                    <p>Memuat aktivitas terkini...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Products Tab -->
+        <div id="products" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📦 Daftar Produk</h3>
+                    <button class="btn btn-primary" onclick="showAddProductModal()">
+                        ➕ Tambah Produk
+                    </button>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-input" id="productSearch" placeholder="Cari produk..." onkeyup="searchProducts()">
+                </div>
+                <div id="productsList">
+                    <p>Memuat data produk...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">💳 Transaksi</h3>
+                    <button class="btn btn-success" onclick="showNewTransactionModal()">
+                        ➕ Transaksi Baru
+                    </button>
+                </div>
+                <div id="transactionsList">
+                    <p>Memuat data transaksi...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Customers Tab -->
+        <div id="customers" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">👥 Pelanggan</h3>
+                    <button class="btn btn-primary" onclick="showAddCustomerModal()">
+                        ➕ Tambah Pelanggan
+                    </button>
+                </div>
+                <div id="customersList">
+                    <p>Memuat data pelanggan...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports Tab -->
+        <div id="reports" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📈 Laporan</h3>
+                    <div>
+                        <input type="date" class="form-input" id="reportStartDate" style="width: auto; margin-right: 10px;">
+                        <input type="date" class="form-input" id="reportEndDate" style="width: auto; margin-right: 10px;">
+                        <button class="btn btn-primary" onclick="generateReport()">
+                            📊 Generate Laporan
+                        </button>
+                    </div>
+                </div>
+                <div id="reportContent">
+                    <p>Pilih tanggal untuk generate laporan...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Tab -->
+        <div id="settings" class="tab-content">
+            <div class="grid grid-cols-2">
+                <div class="card">
+                    <h3 class="card-title">⚙️ Pengaturan Toko</h3>
+                    <div class="form-group">
+                        <label class="form-label">Nama Toko</label>
+                        <input type="text" class="form-input" id="storeName" placeholder="Nama Toko">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Alamat</label>
+                        <textarea class="form-input form-textarea" id="storeAddress" placeholder="Alamat Toko"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Telepon</label>
+                        <input type="tel" class="form-input" id="storePhone" placeholder="Telepon Toko">
+                    </div>
+                    <button class="btn btn-primary" onclick="saveStoreSettings()">
+                        💾 Simpan Pengaturan
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h3 class="card-title">🔄 Backup & Restore</h3>
+                    <div class="form-group">
+                        <label class="form-label">Google Apps Script URL</label>
+                        <input type="url" class="form-input" id="gasUrl" placeholder="https://script.google.com/macros/s/...">
+                    </div>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-success" onclick="backupData()">
+                            ☁️ Backup Data
+                        </button>
+                        <button class="btn btn-warning" onclick="restoreData()">
+                            📥 Restore Data
+                        </button>
+                        <button class="btn btn-secondary" onclick="testConnection()">
+                            🔗 Test Koneksi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Modal Title</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Global variables
+        let currentTab = 'dashboard';
+        let products = [];
+        let transactions = [];
+        let customers = [];
+        let storeSettings = {};
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadStoreSettings();
+            loadDashboardData();
+            updateConnectionStatus('connected');
+        }
+
+        // Tab navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            currentTab = tabName;
+
+            // Load tab-specific data
+            switch(tabName) {
+                case 'dashboard':
+                    loadDashboardData();
+                    break;
+                case 'products':
+                    loadProducts();
+                    break;
+                case 'transactions':
+                    loadTransactions();
+                    break;
+                case 'customers':
+                    loadCustomers();
+                    break;
+                case 'reports':
+                    initializeReports();
+                    break;
+                case 'settings':
+                    loadSettings();
+                    break;
+            }
+        }
+
+        // Connection status
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connectionStatus');
+            statusEl.className = 'status';
+            
+            switch(status) {
+                case 'connected':
+                    statusEl.innerHTML = '✅ Terhubung';
+                    statusEl.classList.add('badge-success');
+                    break;
+                case 'loading':
+                    statusEl.innerHTML = '<span class="loading-spinner"></span> Memuat...';
+                    statusEl.classList.add('loading');
+                    break;
+                case 'error':
+                    statusEl.innerHTML = '❌ Error';
+                    statusEl.classList.add('error');
+                    break;
+            }
+        }
+
+        // Dashboard functions
+        function loadDashboardData() {
+            // Simulate loading dashboard data
+            updateConnectionStatus('loading');
+            
+            setTimeout(() => {
+                // Update stats (simulated data)
+                document.getElementById('totalProducts').textContent = '150';
+                document.getElementById('totalTransactions').textContent = '45';
+                document.getElementById('totalRevenue').textContent = 'Rp 2,450,000';
+                document.getElementById('totalCustomers').textContent = '89';
+                
+                // Update recent activity
+                document.getElementById('recentActivity').innerHTML = `
+                    <div class="table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Waktu</th>
+                                    <th>Aktivitas</th>
+                                    <th>User</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>10:30</td>
+                                    <td>Transaksi baru - #TRX001</td>
+                                    <td>Kasir 1</td>
+                                </tr>
+                                <tr>
+                                    <td>10:15</td>
+                                    <td>Produk ditambah - Nasi Goreng</td>
+                                    <td>Admin</td>
+                                </tr>
+                                <tr>
+                                    <td>09:45</td>
+                                    <td>Backup data berhasil</td>
+                                    <td>System</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                updateConnectionStatus('connected');
+            }, 1000);
+        }
+
+        function refreshDashboard() {
+            loadDashboardData();
+        }
+
+        // Products functions
+        function loadProducts() {
+            updateConnectionStatus('loading');
+            
+            setTimeout(() => {
+                // Simulate products data
+                products = [
+                    { id: 1, name: 'Nasi Goreng', price: 15000, stock: 50, category: 'Makanan' },
+                    { id: 2, name: 'Mie Ayam', price: 12000, stock: 30, category: 'Makanan' },
+                    { id: 3, name: 'Es Teh', price: 5000, stock: 100, category: 'Minuman' }
+                ];
+                
+                displayProducts();
+                updateConnectionStatus('connected');
+            }, 1000);
+        }
+
+        function displayProducts() {
+            const container = document.getElementById('productsList');
+            
+            if (products.length === 0) {
+                container.innerHTML = '<p>Belum ada produk</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nama Produk</th>
+                                <th>Harga</th>
+                                <th>Stok</th>
+                                <th>Kategori</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            products.forEach(product => {
+                html += `
+                    <tr>
+                        <td>${product.id}</td>
+                        <td>${product.name}</td>
+                        <td>Rp ${product.price.toLocaleString('id-ID')}</td>
+                        <td>${product.stock}</td>
+                        <td>${product.category}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="editProduct(${product.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct(${product.id})">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        function searchProducts() {
+            const searchTerm = document.getElementById('productSearch').value.toLowerCase();
+            const filteredProducts = products.filter(product => 
+                product.name.toLowerCase().includes(searchTerm) ||
+                product.category.toLowerCase().includes(searchTerm)
+            );
+            
+            const container = document.getElementById('productsList');
+            if (filteredProducts.length === 0) {
+                container.innerHTML = '<p>Produk tidak ditemukan</p>';
+                return;
+            }
+            
+            // Display filtered products
+            products = filteredProducts;
+            displayProducts();
+        }
+
+        // Transactions functions
+        function loadTransactions() {
+            updateConnectionStatus('loading');
+            
+            setTimeout(() => {
+                // Simulate transactions data
+                transactions = [
+                    { id: 'TRX001', date: '2024-03-27 10:30', customer: 'Budi Santoso', total: 25000, status: 'completed' },
+                    { id: 'TRX002', date: '2024-03-27 10:15', customer: 'Siti Nurhaliza', total: 35000, status: 'completed' },
+                    { id: 'TRX003', date: '2024-03-27 09:45', customer: 'Ahmad Fadli', total: 18000, status: 'pending' }
+                ];
+                
+                displayTransactions();
+                updateConnectionStatus('connected');
+            }, 1000);
+        }
+
+        function displayTransactions() {
+            const container = document.getElementById('transactionsList');
+            
+            if (transactions.length === 0) {
+                container.innerHTML = '<p>Belum ada transaksi</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tanggal</th>
+                                <th>Pelanggan</th>
+                                <th>Total</th>
+                                <th>Status</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            transactions.forEach(transaction => {
+                const statusClass = transaction.status === 'completed' ? 'badge-success' : 'badge-warning';
+                const statusText = transaction.status === 'completed' ? 'Selesai' : 'Pending';
+                
+                html += `
+                    <tr>
+                        <td>${transaction.id}</td>
+                        <td>${transaction.date}</td>
+                        <td>${transaction.customer}</td>
+                        <td>Rp ${transaction.total.toLocaleString('id-ID')}</td>
+                        <td><span class="badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="viewTransaction('${transaction.id}')">Detail</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        // Customers functions
+        function loadCustomers() {
+            updateConnectionStatus('loading');
+            
+            setTimeout(() => {
+                // Simulate customers data
+                customers = [
+                    { id: 1, name: 'Budi Santoso', phone: '08123456789', email: 'budi@email.com', address: 'Jakarta' },
+                    { id: 2, name: 'Siti Nurhaliza', phone: '08234567890', email: 'siti@email.com', address: 'Bandung' },
+                    { id: 3, name: 'Ahmad Fadli', phone: '08345678901', email: 'ahmad@email.com', address: 'Surabaya' }
+                ];
+                
+                displayCustomers();
+                updateConnectionStatus('connected');
+            }, 1000);
+        }
+
+        function displayCustomers() {
+            const container = document.getElementById('customersList');
+            
+            if (customers.length === 0) {
+                container.innerHTML = '<p>Belum ada pelanggan</p>';
+                return;
+            }
+            
+            let html = `
+                <div class="table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nama</th>
+                                <th>Telepon</th>
+                                <th>Email</th>
+                                <th>Alamat</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            customers.forEach(customer => {
+                html += `
+                    <tr>
+                        <td>${customer.id}</td>
+                        <td>${customer.name}</td>
+                        <td>${customer.phone}</td>
+                        <td>${customer.email}</td>
+                        <td>${customer.address}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning" onclick="editCustomer(${customer.id})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteCustomer(${customer.id})">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        // Reports functions
+        function initializeReports() {
+            // Set default dates
+            const today = new Date();
+            const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+            
+            document.getElementById('reportStartDate').value = lastWeek.toISOString().split('T')[0];
+            document.getElementById('reportEndDate').value = today.toISOString().split('T')[0];
+        }
+
+        function generateReport() {
+            const startDate = document.getElementById('reportStartDate').value;
+            const endDate = document.getElementById('reportEndDate').value;
+            
+            if (!startDate || !endDate) {
+                alert('Pilih tanggal mulai dan akhir');
+                return;
+            }
+            
+            updateConnectionStatus('loading');
+            
+            setTimeout(() => {
+                // Simulate report generation
+                const reportContent = document.getElementById('reportContent');
+                reportContent.innerHTML = `
+                    <div class="alert alert-success">
+                        📊 Laporan berhasil dibuat untuk periode ${startDate} hingga ${endDate}
+                    </div>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value">Rp 15,750,000</div>
+                            <div class="stat-label">Total Penjualan</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">234</div>
+                            <div class="stat-label">Total Transaksi</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">Rp 67,308</div>
+                            <div class="stat-label">Rata-rata Transaksi</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">89</div>
+                            <div class="stat-label">Pelanggan Unik</div>
+                        </div>
+                    </div>
+                    
+                    <div class="table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Transaksi</th>
+                                    <th>Pendapatan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>2024-03-27</td>
+                                    <td>45</td>
+                                    <td>Rp 2,450,000</td>
+                                </tr>
+                                <tr>
+                                    <td>2024-03-26</td>
+                                    <td>38</td>
+                                    <td>Rp 2,100,000</td>
+                                </tr>
+                                <tr>
+                                    <td>2024-03-25</td>
+                                    <td>52</td>
+                                    <td>Rp 2,850,000</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                updateConnectionStatus('connected');
+            }, 1500);
+        }
+
+        // Settings functions
+        function loadStoreSettings() {
+            // Load from localStorage
+            const saved = localStorage.getItem('storeSettings');
+            if (saved) {
+                storeSettings = JSON.parse(saved);
+                document.getElementById('storeName').value = storeSettings.name || '';
+                document.getElementById('storeAddress').value = storeSettings.address || '';
+                document.getElementById('storePhone').value = storeSettings.phone || '';
+                document.getElementById('gasUrl').value = storeSettings.gasUrl || '';
+            }
+        }
+
+        function loadSettings() {
+            loadStoreSettings();
+        }
+
+        function saveStoreSettings() {
+            storeSettings = {
+                name: document.getElementById('storeName').value,
+                address: document.getElementById('storeAddress').value,
+                phone: document.getElementById('storePhone').value,
+                gasUrl: document.getElementById('gasUrl').value
+            };
+            
+            localStorage.setItem('storeSettings', JSON.stringify(storeSettings));
+            
+            alert('Pengaturan toko berhasil disimpan!');
+        }
+
+        // Backup & Restore functions
+        function backupData() {
+            const gasUrl = document.getElementById('gasUrl').value;
+            if (!gasUrl) {
+                alert('Masukkan Google Apps Script URL terlebih dahulu!');
+                return;
+            }
+            
+            updateConnectionStatus('loading');
+            
+            // Prepare data for backup
+            const backupData = {
+                action: 'backupAllData',
+                data: {
+                    products: products,
+                    transactions: transactions,
+                    customers: customers,
+                    settings: storeSettings
+                }
+            };
+            
+            // Send to Google Apps Script
+            fetch(gasUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(backupData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Data berhasil di-backup ke Google Sheets!');
+                } else {
+                    alert('❌ Gagal backup: ' + data.error);
+                }
+                updateConnectionStatus('connected');
+            })
+            .catch(error => {
+                console.error('Backup error:', error);
+                alert('❌ Terjadi kesalahan saat backup');
+                updateConnectionStatus('error');
+            });
+        }
+
+        function restoreData() {
+            const gasUrl = document.getElementById('gasUrl').value;
+            if (!gasUrl) {
+                alert('Masukkan Google Apps Script URL terlebih dahulu!');
+                return;
+            }
+            
+            if (!confirm('Apakah Anda yakin ingin restore data? Data yang ada akan ditimpat!')) {
+                return;
+            }
+            
+            updateConnectionStatus('loading');
+            
+            // Request restore from Google Apps Script
+            fetch(gasUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'restoreAllData'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update local data with restored data
+                    if (data.data.products) products = data.data.products;
+                    if (data.data.transactions) transactions = data.data.transactions;
+                    if (data.data.customers) customers = data.data.customers;
+                    
+                    // Refresh current tab
+                    showTab(currentTab);
+                    
+                    alert('✅ Data berhasil di-restore dari Google Sheets!');
+                } else {
+                    alert('❌ Gagal restore: ' + data.error);
+                }
+                updateConnectionStatus('connected');
+            })
+            .catch(error => {
+                console.error('Restore error:', error);
+                alert('❌ Terjadi kesalahan saat restore');
+                updateConnectionStatus('error');
+            });
+        }
+
+        function testConnection() {
+            const gasUrl = document.getElementById('gasUrl').value;
+            if (!gasUrl) {
+                alert('Masukkan Google Apps Script URL terlebih dahulu!');
+                return;
+            }
+            
+            updateConnectionStatus('loading');
+            
+            // Test connection to Google Apps Script
+            fetch(gasUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'testConnection'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Koneksi ke Google Apps Script berhasil!');
+                } else {
+                    alert('❌ Koneksi gagal: ' + data.error);
+                }
+                updateConnectionStatus('connected');
+            })
+            .catch(error => {
+                console.error('Connection test error:', error);
+                alert('❌ Terjadi kesalahan saat test koneksi');
+                updateConnectionStatus('error');
+            });
+        }
+
+        // Modal functions
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('modal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+
+        function showAddProductModal() {
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">Nama Produk</label>
+                    <input type="text" class="form-input" id="newProductName" placeholder="Nama produk">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Harga</label>
+                    <input type="number" class="form-input" id="newProductPrice" placeholder="Harga">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stok</label>
+                    <input type="number" class="form-input" id="newProductStock" placeholder="Stok">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Kategori</label>
+                    <input type="text" class="form-input" id="newProductCategory" placeholder="Kategori">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    <button class="btn btn-primary" onclick="addProduct()">Simpan</button>
+                </div>
+            `;
+            
+            showModal('Tambah Produk', content);
+        }
+
+        function showNewTransactionModal() {
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">Pelanggan</label>
+                    <input type="text" class="form-input" id="transactionCustomer" placeholder="Nama pelanggan">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Produk</label>
+                    <select class="form-input" id="transactionProduct">
+                        <option value="">Pilih produk</option>
+                        ${products.map(p => `<option value="${p.id}">${p.name} - Rp ${p.price.toLocaleString('id-ID')}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Jumlah</label>
+                    <input type="number" class="form-input" id="transactionQuantity" placeholder="Jumlah" value="1">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    <button class="btn btn-success" onclick="addTransaction()">Simpan</button>
+                </div>
+            `;
+            
+            showModal('Transaksi Baru', content);
+        }
+
+        function showAddCustomerModal() {
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">Nama</label>
+                    <input type="text" class="form-input" id="newCustomerName" placeholder="Nama pelanggan">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Telepon</label>
+                    <input type="tel" class="form-input" id="newCustomerPhone" placeholder="Telepon">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="newCustomerEmail" placeholder="Email">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Alamat</label>
+                    <textarea class="form-input form-textarea" id="newCustomerAddress" placeholder="Alamat"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    <button class="btn btn-primary" onclick="addCustomer()">Simpan</button>
+                </div>
+            `;
+            
+            showModal('Tambah Pelanggan', content);
+        }
+
+        // CRUD operations
+        function addProduct() {
+            const name = document.getElementById('newProductName').value;
+            const price = parseInt(document.getElementById('newProductPrice').value);
+            const stock = parseInt(document.getElementById('newProductStock').value);
+            const category = document.getElementById('newProductCategory').value;
+            
+            if (!name || !price || !stock || !category) {
+                alert('Lengkapi semua field!');
+                return;
+            }
+            
+            const newProduct = {
+                id: products.length + 1,
+                name: name,
+                price: price,
+                stock: stock,
+                category: category
+            };
+            
+            products.push(newProduct);
+            displayProducts();
+            closeModal();
+            
+            alert('✅ Produk berhasil ditambahkan!');
+        }
+
+        function addTransaction() {
+            const customer = document.getElementById('transactionCustomer').value;
+            const productId = parseInt(document.getElementById('transactionProduct').value);
+            const quantity = parseInt(document.getElementById('transactionQuantity').value);
+            
+            if (!customer || !productId || !quantity) {
+                alert('Lengkapi semua field!');
+                return;
+            }
+            
+            const product = products.find(p => p.id === productId);
+            if (!product) {
+                alert('Produk tidak ditemukan!');
+                return;
+            }
+            
+            const newTransaction = {
+                id: 'TRX' + String(transactions.length + 1).padStart(3, '0'),
+                date: new Date().toLocaleString('id-ID'),
+                customer: customer,
+                total: product.price * quantity,
+                status: 'completed'
+            };
+            
+            transactions.push(newTransaction);
+            
+            // Update product stock
+            product.stock -= quantity;
+            
+            displayTransactions();
+            closeModal();
+            
+            alert('✅ Transaksi berhasil ditambahkan!');
+        }
+
+        function addCustomer() {
+            const name = document.getElementById('newCustomerName').value;
+            const phone = document.getElementById('newCustomerPhone').value;
+            const email = document.getElementById('newCustomerEmail').value;
+            const address = document.getElementById('newCustomerAddress').value;
+            
+            if (!name || !phone || !email || !address) {
+                alert('Lengkapi semua field!');
+                return;
+            }
+            
+            const newCustomer = {
+                id: customers.length + 1,
+                name: name,
+                phone: phone,
+                email: email,
+                address: address
+            };
+            
+            customers.push(newCustomer);
+            displayCustomers();
+            closeModal();
+            
+            alert('✅ Pelanggan berhasil ditambahkan!');
+        }
+
+        function editProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">Nama Produk</label>
+                    <input type="text" class="form-input" id="editProductName" value="${product.name}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Harga</label>
+                    <input type="number" class="form-input" id="editProductPrice" value="${product.price}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Stok</label>
+                    <input type="number" class="form-input" id="editProductStock" value="${product.stock}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Kategori</label>
+                    <input type="text" class="form-input" id="editProductCategory" value="${product.category}">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    <button class="btn btn-primary" onclick="updateProduct(${id})">Update</button>
+                </div>
+            `;
+            
+            showModal('Edit Produk', content);
+        }
+
+        function updateProduct(id) {
+            const product = products.find(p => p.id === id);
+            if (!product) return;
+            
+            product.name = document.getElementById('editProductName').value;
+            product.price = parseInt(document.getElementById('editProductPrice').value);
+            product.stock = parseInt(document.getElementById('editProductStock').value);
+            product.category = document.getElementById('editProductCategory').value;
+            
+            displayProducts();
+            closeModal();
+            
+            alert('✅ Produk berhasil diupdate!');
+        }
+
+        function deleteProduct(id) {
+            if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+                return;
+            }
+            
+            products = products.filter(p => p.id !== id);
+            displayProducts();
+            
+            alert('✅ Produk berhasil dihapus!');
+        }
+
+        function editCustomer(id) {
+            const customer = customers.find(c => c.id === id);
+            if (!customer) return;
+            
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">Nama</label>
+                    <input type="text" class="form-input" id="editCustomerName" value="${customer.name}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Telepon</label>
+                    <input type="tel" class="form-input" id="editCustomerPhone" value="${customer.phone}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <input type="email" class="form-input" id="editCustomerEmail" value="${customer.email}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Alamat</label>
+                    <textarea class="form-input form-textarea" id="editCustomerAddress">${customer.address}</textarea>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Batal</button>
+                    <button class="btn btn-primary" onclick="updateCustomer(${id})">Update</button>
+                </div>
+            `;
+            
+            showModal('Edit Pelanggan', content);
+        }
+
+        function updateCustomer(id) {
+            const customer = customers.find(c => c.id === id);
+            if (!customer) return;
+            
+            customer.name = document.getElementById('editCustomerName').value;
+            customer.phone = document.getElementById('editCustomerPhone').value;
+            customer.email = document.getElementById('editCustomerEmail').value;
+            customer.address = document.getElementById('editCustomerAddress').value;
+            
+            displayCustomers();
+            closeModal();
+            
+            alert('✅ Pelanggan berhasil diupdate!');
+        }
+
+        function deleteCustomer(id) {
+            if (!confirm('Apakah Anda yakin ingin menghapus pelanggan ini?')) {
+                return;
+            }
+            
+            customers = customers.filter(c => c.id !== id);
+            displayCustomers();
+            
+            alert('✅ Pelanggan berhasil dihapus!');
+        }
+
+        function viewTransaction(id) {
+            const transaction = transactions.find(t => t.id === id);
+            if (!transaction) return;
+            
+            const content = `
+                <div class="form-group">
+                    <label class="form-label">ID Transaksi</label>
+                    <input type="text" class="form-input" value="${transaction.id}" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tanggal</label>
+                    <input type="text" class="form-input" value="${transaction.date}" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pelanggan</label>
+                    <input type="text" class="form-input" value="${transaction.customer}" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Total</label>
+                    <input type="text" class="form-input" value="Rp ${transaction.total.toLocaleString('id-ID')}" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <input type="text" class="form-input" value="${transaction.status === 'completed' ? 'Selesai' : 'Pending'}" readonly>
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button class="btn btn-secondary" onclick="closeModal()">Tutup</button>
+                </div>
+            `;
+            
+            showModal('Detail Transaksi', content);
+        }
+
+        // Close modal when clicking outside
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

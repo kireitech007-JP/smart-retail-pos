@@ -1,0 +1,1209 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS KASIR PRO - Smart Retail POS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-foreground: #ffffff;
+            --secondary: #64748b;
+            --muted: #f1f5f9;
+            --muted-foreground: #64748b;
+            --accent: #f59e0b;
+            --destructive: #ef4444;
+            --background: #ffffff;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --foreground: #1e293b;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+            --shadow-elevated: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: var(--background);
+            color: var(--foreground);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        .h-screen {
+            height: 100vh;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .flex-col {
+            flex-direction: column;
+        }
+
+        .flex-1 {
+            flex: 1;
+        }
+
+        .items-center {
+            align-items: center;
+        }
+
+        .justify-between {
+            justify-content: space-between;
+        }
+
+        .justify-center {
+            justify-content: center;
+        }
+
+        .gap-2 {
+            gap: 0.5rem;
+        }
+
+        .gap-3 {
+            gap: 0.75rem;
+        }
+
+        .gap-4 {
+            gap: 1rem;
+        }
+
+        .p-4 {
+            padding: 1rem;
+        }
+
+        .px-3 {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+
+        .px-4 {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        .py-1 {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+        }
+
+        .py-1\.5 {
+            padding-top: 0.375rem;
+            padding-bottom: 0.375rem;
+        }
+
+        .py-2 {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+        }
+
+        .py-2\.5 {
+            padding-top: 0.625rem;
+            padding-bottom: 0.625rem;
+        }
+
+        .h-14 {
+            height: 3.5rem;
+        }
+
+        .w-4 {
+            width: 1rem;
+        }
+
+        .h-4 {
+            height: 1rem;
+        }
+
+        .w-8 {
+            width: 2rem;
+        }
+
+        .h-8 {
+            height: 2rem;
+        }
+
+        .w-96 {
+            width: 24rem;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        .rounded-lg {
+            border-radius: 0.5rem;
+        }
+
+        .rounded-xl {
+            border-radius: 0.75rem;
+        }
+
+        .border {
+            border: 1px solid var(--border);
+        }
+
+        .border-b {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .border-l {
+            border-left: 1px solid var(--border);
+        }
+
+        .border-t {
+            border-top: 1px solid var(--border);
+        }
+
+        .bg-card {
+            background-color: var(--card);
+        }
+
+        .bg-background {
+            background-color: var(--background);
+        }
+
+        .bg-muted {
+            background-color: var(--muted);
+        }
+
+        .text-sm {
+            font-size: 0.875rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+        }
+
+        .text-xl {
+            font-size: 1.25rem;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .font-medium {
+            font-weight: 500;
+        }
+
+        .font-semibold {
+            font-weight: 600;
+        }
+
+        .text-foreground {
+            color: var(--foreground);
+        }
+
+        .text-muted-foreground {
+            color: var(--muted-foreground);
+        }
+
+        .text-primary {
+            color: var(--primary);
+        }
+
+        .text-destructive {
+            color: var(--destructive);
+        }
+
+        .text-accent {
+            color: var(--accent);
+        }
+
+        .hover\:bg-muted:hover {
+            background-color: var(--muted);
+        }
+
+        .hover\:bg-destructive\/10:hover {
+            background-color: rgba(239, 68, 68, 0.1);
+        }
+
+        .hover\:bg-destructive\/20:hover {
+            background-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .hover\:opacity-90:hover {
+            opacity: 0.9;
+        }
+
+        .disabled\:opacity-50:disabled {
+            opacity: 0.5;
+        }
+
+        .transition-all {
+            transition: all 0.2s ease;
+        }
+
+        .overflow-hidden {
+            overflow: hidden;
+        }
+
+        .overflow-y-auto {
+            overflow-y: auto;
+        }
+
+        .flex-shrink-0 {
+            flex-shrink: 0;
+        }
+
+        .relative {
+            position: relative;
+        }
+
+        .absolute {
+            position: absolute;
+        }
+
+        .top-2 {
+            top: 0.5rem;
+        }
+
+        .right-2 {
+            right: 0.5rem;
+        }
+
+        .left-3 {
+            left: 0.75rem;
+        }
+
+        .top-1\/2 {
+            top: 50%;
+        }
+
+        .-translate-y-1\/2 {
+            transform: translateY(-50%);
+        }
+
+        .grid {
+            display: grid;
+        }
+
+        .grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .grid-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .content-start {
+            align-content: start;
+        }
+
+        .gap-3 {
+            gap: 0.75rem;
+        }
+
+        .shadow-card {
+            box-shadow: var(--shadow);
+        }
+
+        .shadow-elevated {
+            box-shadow: var(--shadow-elevated);
+        }
+
+        .primary-gradient {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        }
+
+        .text-primary-foreground {
+            color: var(--primary-foreground);
+        }
+
+        .bg-purple-500\/10 {
+            background-color: rgba(168, 85, 247, 0.1);
+        }
+
+        .text-purple-700 {
+            color: #6b21a8;
+        }
+
+        .hover\:bg-purple-500\/20:hover {
+            background-color: rgba(168, 85, 247, 0.2);
+        }
+
+        .bg-blue-500\/10 {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        .text-blue-700 {
+            color: #1d4ed8;
+        }
+
+        .hover\:bg-blue-500\/20:hover {
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        input, select, textarea {
+            outline: none;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            ring: 2px solid var(--primary);
+            ring-offset: 2px;
+        }
+
+        .focus\:ring-2:focus {
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .block {
+            display: block;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .max-w-md {
+            max-width: 28rem;
+        }
+
+        .w-16 {
+            width: 4rem;
+        }
+
+        .h-16 {
+            height: 4rem;
+        }
+
+        .rounded-2xl {
+            border-radius: 1rem;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        .mb-4 {
+            margin-bottom: 1rem;
+        }
+
+        .mb-6 {
+            margin-bottom: 1.5rem;
+        }
+
+        .mt-4 {
+            margin-top: 1rem;
+        }
+
+        .hover\:scale-\[1\.02\]:hover {
+            transform: scale(1.02);
+        }
+
+        .opacity-50 {
+            opacity: 0.5;
+        }
+
+        .w-6 {
+            width: 1.5rem;
+        }
+
+        .h-6 {
+            height: 1.5rem;
+        }
+
+        .text-xs {
+            font-size: 0.75rem;
+        }
+
+        .font-bold {
+            font-weight: 700;
+        }
+
+        .p-1 {
+            padding: 0.25rem;
+        }
+
+        .rounded {
+            border-radius: 0.25rem;
+        }
+
+        .bg-muted\/30 {
+            background-color: rgba(241, 245, 249, 0.3);
+        }
+
+        .space-y-3 > * + * {
+            margin-top: 0.75rem;
+        }
+
+        .space-y-2 > * + * {
+            margin-top: 0.5rem;
+        }
+
+        .space-y-1 > * + * {
+            margin-top: 0.25rem;
+        }
+
+        .py-8 {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+
+        .w-12 {
+            width: 3rem;
+        }
+
+        .h-12 {
+            height: 3rem;
+        }
+
+        .mx-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .text-lg {
+            font-size: 1.125rem;
+        }
+
+        .pt-2 {
+            padding-top: 0.5rem;
+        }
+
+        .border-input {
+            border-color: var(--border);
+        }
+
+        .step-0\.1 {
+            step: 0.1;
+        }
+
+        .min-0\.1 {
+            min: 0.1;
+        }
+
+        .fixed {
+            position: fixed;
+        }
+
+        .inset-0 {
+            top: 0;
+            right: 0;
+            bottom: 0;
+            left: 0;
+        }
+
+        .bg-black {
+            background-color: rgb(0 0 0);
+        }
+
+        .bg-opacity-50 {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .z-50 {
+            z-index: 50;
+        }
+
+        .max-h-\[80vh\] {
+            max-height: 80vh;
+        }
+
+        .mx-4 {
+            margin-left: 1rem;
+            margin-right: 1rem;
+        }
+
+        .space-y-4 > * + * {
+            margin-top: 1rem;
+        }
+
+        .block {
+            display: block;
+        }
+
+        .mb-2 {
+            margin-bottom: 0.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            
+            .grid-cols-3 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            
+            .grid-cols-4 {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            
+            .w-96 {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="h-screen flex flex-col bg-background overflow-hidden">
+        <!-- Header -->
+        <header class="h-14 bg-card border-b border-border flex items-center justify-between px-4 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center">
+                    <svg class="w-4 h-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold text-foreground">POS KASIR PRO</h1>
+                    <p class="text-xs text-muted-foreground" id="userInfo">Admin • Toko Utama</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all primary-gradient text-primary-foreground" onclick="showPage('dashboard')">
+                    Dashboard
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-all" onclick="showPage('cashin')">
+                    Kas Masuk
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-all" onclick="showPage('pos')">
+                    Kasir
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-all" onclick="showPage('expense')">
+                    Pengeluaran
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:bg-muted transition-all" onclick="showPage('debt')">
+                    Piutang
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 transition-all" onclick="testConnection()">
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"></path>
+                    </svg>Test
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 transition-all" onclick="backupData()">
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"></path>
+                    </svg>Backup
+                </button>
+                <button class="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-all" onclick="closeCashier()">
+                    <svg class="w-3 h-3 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>Tutup Kasir
+                </button>
+                <button class="p-2 rounded-lg hover:bg-muted" onclick="logout()">
+                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Top Footer - Add Stock Button -->
+        <div class="bg-card border-b border-border px-4 py-2 flex-shrink-0">
+            <button class="px-4 py-2 primary-gradient text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2" onclick="showAddProductModal()">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Tambah Stok Produk
+            </button>
+        </div>
+
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="flex-1 overflow-y-auto block">
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-foreground mb-4">Dashboard Kasir</h2>
+                
+                <!-- Stats Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-card rounded-xl p-4 shadow-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <svg class="w-8 h-8 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"></path>
+                            </svg>
+                            <span class="text-xs text-muted-foreground">Hari Ini</span>
+                        </div>
+                        <div class="text-2xl font-bold text-primary" id="todayRevenue">Rp 0</div>
+                        <div class="text-xs text-muted-foreground">Pendapatan</div>
+                    </div>
+                    
+                    <div class="bg-card rounded-xl p-4 shadow-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <svg class="w-8 h-8 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                            </svg>
+                            <span class="text-xs text-muted-foreground">Hari Ini</span>
+                        </div>
+                        <div class="text-2xl font-bold text-primary" id="todayTransactions">0</div>
+                        <div class="text-xs text-muted-foreground">Transaksi</div>
+                    </div>
+                    
+                    <div class="bg-card rounded-xl p-4 shadow-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <svg class="w-8 h-8 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            <span class="text-xs text-muted-foreground">Total</span>
+                        </div>
+                        <div class="text-2xl font-bold text-primary" id="totalCustomers">0</div>
+                        <div class="text-xs text-muted-foreground">Pelanggan</div>
+                    </div>
+                    
+                    <div class="bg-card rounded-xl p-4 shadow-card">
+                        <div class="flex items-center justify-between mb-2">
+                            <svg class="w-8 h-8 text-primary/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                            <span class="text-xs text-muted-foreground">Total</span>
+                        </div>
+                        <div class="text-2xl font-bold text-primary" id="totalProducts">0</div>
+                        <div class="text-xs text-muted-foreground">Produk</div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-card rounded-xl p-4 shadow-card">
+                    <h3 class="font-semibold text-foreground mb-3">Aktivitas Terkini</h3>
+                    <div id="recentActivity">
+                        <p class="text-muted-foreground text-center py-4">Belum ada aktivitas</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kasir Page -->
+        <div id="posPage" class="flex-1 flex overflow-hidden hidden">
+            <!-- Products -->
+            <div class="flex-1 flex flex-col overflow-hidden p-4">
+                <div class="flex gap-2 mb-4">
+                    <div class="flex-1 relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <input id="productSearch" placeholder="Cari produk..." class="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:ring-2" />
+                    </div>
+                </div>
+                <div class="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start" id="productsGrid">
+                    <!-- Products will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Cart -->
+            <div class="w-96 bg-card border-l border-border flex flex-col">
+                <div class="p-4 border-b border-border flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <h3 class="font-bold text-foreground">Keranjang</h3>
+                        <span class="text-xs text-muted-foreground" id="cartCount">(0)</span>
+                    </div>
+                    <button class="text-xs text-destructive hover:underline" onclick="clearCart()">Hapus Semua</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-4 space-y-3" id="cartItems">
+                    <div class="text-center py-8">
+                        <svg class="w-12 h-12 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <p class="text-muted-foreground">Keranjang kosong</p>
+                    </div>
+                </div>
+
+                <div class="p-4 border-t border-border bg-muted/30">
+                    <div class="flex justify-between mb-3">
+                        <span class="text-sm text-muted-foreground">Subtotal</span>
+                        <span class="text-lg font-bold text-foreground" id="subtotal">Rp 0</span>
+                    </div>
+                    <button class="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90" onclick="showPaymentModal()">
+                        Bayar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Other Pages (Placeholder) -->
+        <div id="cashinPage" class="flex-1 overflow-y-auto hidden">
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-foreground mb-4">Kas Masuk</h2>
+                <div class="bg-card rounded-xl p-4 shadow-card">
+                    <p class="text-muted-foreground">Halaman Kas Masuk - dalam pengembangan</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="expensePage" class="flex-1 overflow-y-auto hidden">
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-foreground mb-4">Pengeluaran</h2>
+                <div class="bg-card rounded-xl p-4 shadow-card">
+                    <p class="text-muted-foreground">Halaman Pengeluaran - dalam pengembangan</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="debtPage" class="flex-1 overflow-y-auto hidden">
+            <div class="p-4">
+                <h2 class="text-xl font-bold text-foreground mb-4">Piutang</h2>
+                <div class="bg-card rounded-xl p-4 shadow-card">
+                    <p class="text-muted-foreground">Halaman Piutang - dalam pengembangan</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-card rounded-xl p-6 max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-foreground" id="modalTitle">Modal Title</h3>
+                <button class="text-muted-foreground hover:text-foreground" onclick="closeModal()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="modalBody">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentPage = 'dashboard';
+        let cart = [];
+        let products = [];
+        let transactions = [];
+        let customers = [];
+        let storeSettings = {};
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            loadSampleData();
+            updateDashboard();
+            updateProductsGrid();
+            updateCart();
+        }
+
+        function loadSampleData() {
+            // Sample products
+            products = [
+                { id: 1, name: 'Nasi Goreng', price: 15000, stock: 50, category: 'Makanan', satuan: 'porsi', supplier: 'Supplier A' },
+                { id: 2, name: 'Mie Ayam', price: 12000, stock: 30, category: 'Makanan', satuan: 'porsi', supplier: 'Supplier A' },
+                { id: 3, name: 'Es Teh Manis', price: 5000, stock: 100, category: 'Minuman', satuan: 'gelas', supplier: 'Supplier B' },
+                { id: 4, name: 'Ayam Bakar', price: 18000, stock: 25, category: 'Makanan', satuan: 'porsi', supplier: 'Supplier A' },
+                { id: 5, name: 'Jus Jeruk', price: 8000, stock: 40, category: 'Minuman', satuan: 'gelas', supplier: 'Supplier B' },
+                { id: 6, name: 'Gado-Gado', price: 10000, stock: 20, category: 'Makanan', satuan: 'porsi', supplier: 'Supplier C' }
+            ];
+
+            // Sample transactions
+            transactions = [
+                { id: 'TRX001', date: new Date().toISOString(), customer: 'Budi Santoso', total: 25000, paymentType: 'cash' },
+                { id: 'TRX002', date: new Date().toISOString(), customer: 'Siti Nurhaliza', total: 35000, paymentType: 'transfer' },
+                { id: 'TRX003', date: new Date().toISOString(), customer: 'Ahmad Fadli', total: 18000, paymentType: 'cash' }
+            ];
+
+            // Sample customers
+            customers = [
+                { id: 1, name: 'Budi Santoso', phone: '08123456789', email: 'budi@email.com' },
+                { id: 2, name: 'Siti Nurhaliza', phone: '08234567890', email: 'siti@email.com' },
+                { id: 3, name: 'Ahmad Fadli', phone: '08345678901', email: 'ahmad@email.com' }
+            ];
+        }
+
+        function showPage(page) {
+            // Hide all pages
+            document.getElementById('dashboardPage').classList.add('hidden');
+            document.getElementById('posPage').classList.add('hidden');
+            document.getElementById('cashinPage').classList.add('hidden');
+            document.getElementById('expensePage').classList.add('hidden');
+            document.getElementById('debtPage').classList.add('hidden');
+
+            // Show selected page
+            document.getElementById(page + 'Page').classList.remove('hidden');
+            currentPage = page;
+
+            // Update navigation buttons
+            const buttons = document.querySelectorAll('header button');
+            buttons.forEach(btn => {
+                btn.classList.remove('primary-gradient', 'text-primary-foreground');
+                btn.classList.add('text-muted-foreground', 'hover:bg-muted');
+            });
+
+            // Highlight active button
+            event.target.classList.remove('text-muted-foreground', 'hover:bg-muted');
+            event.target.classList.add('primary-gradient', 'text-primary-foreground');
+        }
+
+        function updateDashboard() {
+            // Update stats
+            const todayRevenue = transactions.reduce((sum, t) => sum + t.total, 0);
+            document.getElementById('todayRevenue').textContent = formatRupiah(todayRevenue);
+            document.getElementById('todayTransactions').textContent = transactions.length;
+            document.getElementById('totalCustomers').textContent = customers.length;
+            document.getElementById('totalProducts').textContent = products.length;
+
+            // Update recent activity
+            const activityHtml = transactions.slice(0, 5).map(tx => `
+                <div class="flex justify-between items-center py-2 border-b border-border">
+                    <div>
+                        <div class="font-medium text-sm">Transaksi #${tx.id}</div>
+                        <div class="text-xs text-muted-foreground">${tx.customer} • ${formatTime(tx.date)}</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold text-primary">${formatRupiah(tx.total)}</div>
+                        <div class="text-xs text-muted-foreground">${tx.paymentType}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('recentActivity').innerHTML = activityHtml || '<p class="text-muted-foreground text-center py-4">Belum ada aktivitas</p>';
+        }
+
+        function updateProductsGrid() {
+            const searchQuery = document.getElementById('productSearch')?.value?.toLowerCase() || '';
+            const filteredProducts = products.filter(p => 
+                p.name.toLowerCase().includes(searchQuery) ||
+                p.category.toLowerCase().includes(searchQuery)
+            );
+
+            const productsHtml = filteredProducts.map(product => `
+                <button onclick="addToCart(${product.id})" class="bg-card rounded-xl p-4 text-left shadow-card hover:shadow-elevated transition-all relative hover:scale-[1.02] ${product.stock <= 0 ? 'opacity-50' : ''}">
+                    ${product.stock <= 5 && product.stock > 0 ? `
+                        <div class="absolute top-2 right-2">
+                            <svg class="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                            </svg>
+                        </div>
+                    ` : ''}
+                    <svg class="w-8 h-8 text-primary/30 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <p class="text-sm font-semibold text-foreground truncate">${product.name}</p>
+                    <p class="text-xs text-muted-foreground truncate">${product.supplier}</p>
+                    <div class="mt-2 space-y-1">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">Satuan:</span>
+                            <span class="text-xs font-medium text-foreground">${product.satuan}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">Harga:</span>
+                            <span class="text-sm font-bold text-primary">${formatRupiah(product.price)}</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-muted-foreground">Stok:</span>
+                            <span class="text-xs font-medium ${product.stock <= 5 ? 'text-accent' : 'text-foreground'}">${product.stock} ${product.satuan}</span>
+                        </div>
+                    </div>
+                </button>
+            `).join('');
+
+            document.getElementById('productsGrid').innerHTML = productsHtml || '<p class="text-muted-foreground text-center col-span-full">Produk tidak ditemukan</p>';
+        }
+
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product || product.stock <= 0) return;
+
+            const existingItem = cart.find(item => item.productId === productId);
+            if (existingItem) {
+                existingItem.qty += 1;
+            } else {
+                cart.push({
+                    productId: productId,
+                    qty: 1,
+                    product: product
+                });
+            }
+
+            updateCart();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.productId !== productId);
+            updateCart();
+        }
+
+        function updateCartQty(productId, qty) {
+            const item = cart.find(item => item.productId === productId);
+            if (item) {
+                item.qty = Math.max(0.1, parseFloat(qty) || 0);
+                updateCart();
+            }
+        }
+
+        function clearCart() {
+            if (confirm('Hapus semua item dari keranjang?')) {
+                cart = [];
+                updateCart();
+            }
+        }
+
+        function updateCart() {
+            const cartItemsHtml = cart.map(item => {
+                const subtotal = item.product.price * item.qty;
+                return `
+                    <div class="bg-background rounded-lg p-3">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="flex-1">
+                                <h4 class="font-medium text-foreground text-sm">${item.product.name}</h4>
+                                <p class="text-xs text-muted-foreground">${item.product.supplier}</p>
+                                <div class="mt-1 flex gap-2">
+                                    <span class="text-xs bg-muted px-2 py-0.5 rounded">${item.product.satuan}</span>
+                                </div>
+                            </div>
+                            <button onclick="removeFromCart(${item.productId})" class="text-destructive hover:bg-destructive/10 p-1 rounded">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="space-y-2">
+                            <div class="grid grid-cols-2 gap-2 text-sm">
+                                <div>
+                                    <label class="text-xs text-muted-foreground">Jumlah</label>
+                                    <input type="number" value="${item.qty}" onchange="updateCartQty(${item.productId}, this.value)" class="w-full px-2 py-1.5 rounded border border-input bg-background text-foreground text-sm" step="0.1" min="0.1" />
+                                </div>
+                                <div>
+                                    <label class="text-xs text-muted-foreground">Harga/Unit</label>
+                                    <p class="text-sm font-medium text-foreground">${formatRupiah(item.product.price)}</p>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-border">
+                                <span class="text-xs text-muted-foreground">Subtotal:</span>
+                                <span class="text-sm font-bold text-primary">${formatRupiah(subtotal)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
+
+            document.getElementById('cartItems').innerHTML = cartItemsHtml || `
+                <div class="text-center py-8">
+                    <svg class="w-12 h-12 text-muted-foreground mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                    <p class="text-muted-foreground">Keranjang kosong</p>
+                </div>
+            `;
+
+            document.getElementById('cartCount').textContent = `(${cart.length})`;
+            document.getElementById('subtotal').textContent = formatRupiah(subtotal);
+        }
+
+        function showPaymentModal() {
+            if (cart.length === 0) {
+                alert('Keranjang masih kosong!');
+                return;
+            }
+
+            const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
+            
+            showModal('Pembayaran', `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Total Pembayaran</label>
+                        <div class="text-2xl font-bold text-primary">${formatRupiah(subtotal)}</div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Metode Pembayaran</label>
+                        <select id="paymentType" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground">
+                            <option value="cash">Tunai</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="credit">Kredit</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Nama Pelanggan</label>
+                        <input type="text" id="customerName" placeholder="Nama pelanggan (opsional)" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Uang Dibayar</label>
+                        <input type="number" id="cashPaid" placeholder="0" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <button onclick="processPayment()" class="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">
+                        Proses Pembayaran
+                    </button>
+                </div>
+            `);
+        }
+
+        function processPayment() {
+            const paymentType = document.getElementById('paymentType').value;
+            const customerName = document.getElementById('customerName').value || 'Umum';
+            const cashPaid = parseFloat(document.getElementById('cashPaid').value) || 0;
+            const subtotal = cart.reduce((sum, item) => sum + (item.product.price * item.qty), 0);
+
+            const transaction = {
+                id: 'TRX' + String(transactions.length + 1).padStart(3, '0'),
+                date: new Date().toISOString(),
+                customer: customerName,
+                total: subtotal,
+                paymentType: paymentType,
+                items: cart.map(item => ({
+                    productId: item.productId,
+                    productName: item.product.name,
+                    qty: item.qty,
+                    price: item.product.price,
+                    subtotal: item.product.price * item.qty
+                }))
+            };
+
+            transactions.push(transaction);
+            cart = [];
+
+            closeModal();
+            updateDashboard();
+            updateCart();
+            
+            alert(`Pembayaran berhasil! Transaksi #${transaction.id}`);
+        }
+
+        function showAddProductModal() {
+            showModal('Tambah Stok Produk', `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Nama Produk</label>
+                        <input type="text" id="newProductName" placeholder="Nama produk" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Harga</label>
+                        <input type="number" id="newProductPrice" placeholder="0" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Stok</label>
+                        <input type="number" id="newProductStock" placeholder="0" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Kategori</label>
+                        <input type="text" id="newProductCategory" placeholder="Kategori" class="w-full px-3 py-2 rounded-lg border border-input bg-card text-foreground" />
+                    </div>
+                    
+                    <button onclick="addProduct()" class="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">
+                        Tambah Produk
+                    </button>
+                </div>
+            `);
+        }
+
+        function addProduct() {
+            const name = document.getElementById('newProductName').value;
+            const price = parseFloat(document.getElementById('newProductPrice').value) || 0;
+            const stock = parseInt(document.getElementById('newProductStock').value) || 0;
+            const category = document.getElementById('newProductCategory').value;
+
+            if (!name || price <= 0 || stock <= 0 || !category) {
+                alert('Lengkapi semua field dengan benar!');
+                return;
+            }
+
+            const newProduct = {
+                id: products.length + 1,
+                name: name,
+                price: price,
+                stock: stock,
+                category: category,
+                satuan: 'pcs',
+                supplier: 'Manual Entry'
+            };
+
+            products.push(newProduct);
+            closeModal();
+            updateProductsGrid();
+            updateDashboard();
+            
+            alert('Produk berhasil ditambahkan!');
+        }
+
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalBody').innerHTML = content;
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('modal').classList.remove('flex');
+        }
+
+        function formatRupiah(amount) {
+            return new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(amount);
+        }
+
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function testConnection() {
+            alert('Test koneksi ke Google Apps Script - dalam pengembangan');
+        }
+
+        function backupData() {
+            alert('Backup data ke Google Sheets - dalam pengembangan');
+        }
+
+        function closeCashier() {
+            if (confirm('Tutup sesi kasir?')) {
+                alert('Sesi kasir ditutup');
+            }
+        }
+
+        function logout() {
+            if (confirm('Logout dari aplikasi?')) {
+                alert('Logout berhasil');
+            }
+        }
+
+        // Search functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('productSearch');
+            if (searchInput) {
+                searchInput.addEventListener('input', updateProductsGrid);
+            }
+        });
+
+        // Close modal on outside click
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>
