@@ -4,13 +4,22 @@ import { formatRupiah, formatDateTime } from '@/lib/format';
 import { 
   ShoppingCart, Plus, Minus, X, Search, DollarSign, CreditCard, Banknote, 
   Receipt, Package, LogOut, Store, Wallet, TrendingDown, FileText, 
-  Printer, Download, MessageSquare, Clock, AlertTriangle, Cloud
+  Printer, Download, MessageSquare, Clock, AlertTriangle, Cloud, Database
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CashIn from '@/components/CashIn';
 import CashierDashboard from '@/components/CashierDashboard';
 import ExportButtons from '@/components/ExportButtons';
 import PrintButtons from '@/components/PrintButtons';
+import { 
+  backupAllData, 
+  testConnection,
+  backupTransaksi,
+  backupTransaksiItems,
+  backupKasMasuk,
+  backupPengeluaran,
+  backupPiutang
+} from '@/lib/googleSheets';
 
 export default function CashierPOS() {
   const { 
@@ -30,6 +39,7 @@ export default function CashierPOS() {
   const [showInvoice, setShowInvoice] = useState<Transaction | null>(null);
   const [showCashierOpen, setShowCashierOpen] = useState(false);
   const [showCashierClose, setShowCashierClose] = useState(false);
+  const [isBackupLoading, setIsBackupLoading] = useState(false);
   const [activePage, setActivePage] = useState<'dashboard' | 'cashin' | 'pos' | 'expense' | 'debt'>('dashboard');
 
   // Payment state
@@ -379,6 +389,123 @@ export default function CashierPOS() {
     const msg = `*${invoiceType === 'invoice' ? 'INVOICE' : 'FAKTUR'}*\n${storeSettings.storeName}\nNo: ${showInvoice.id.slice(-6).toUpperCase()}\n\n${items}\n\nTotal: ${formatRupiah(showInvoice.grandTotal)}\nPembayaran: ${showInvoice.paymentType === 'cash' ? 'Tunai' : showInvoice.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}`;
     const phone = showInvoice.customerPhone.replace(/[^0-9]/g, '');
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`);
+  };
+
+  // Backup functions
+  const handleBackupAll = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      const backupData = {
+        kategori: [],
+        satuan: [],
+        produk: unitProducts,
+        pengguna: [],
+        unit: [userUnit],
+        transaksi: transactions.filter(t => t.unitId === currentUser?.unitId),
+        transaksiItems: transactions.filter(t => t.unitId === currentUser?.unitId).flatMap(tx => tx.items || []),
+        piutang: debts.filter(d => d.unitId === currentUser?.unitId),
+        kasMasuk: cashIns.filter(c => c.unitId === currentUser?.unitId),
+        pengeluaran: expenses.filter(e => e.unitId === currentUser?.unitId),
+        laporan: [],
+        sessions: cashierSessions.filter(s => s.unitId === currentUser?.unitId)
+      };
+      await backupAllData(backupData);
+      toast.success('Data unit berhasil di-backup ke Google Sheets!');
+    } catch (error) {
+      toast.error('Gagal backup data ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
+  };
+
+  const handleBackupTransactions = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      const unitTransactions = transactions.filter(t => t.unitId === currentUser?.unitId);
+      const transactionItems = unitTransactions.flatMap(tx => tx.items || []);
+      await backupTransaksi(unitTransactions);
+      await backupTransaksiItems(transactionItems);
+      toast.success('Transaksi berhasil di-backup ke Google Sheets!');
+    } catch (error) {
+      toast.error('Gagal backup transaksi ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
+  };
+
+  const handleBackupCashIn = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      const unitCashIn = cashIns.filter(c => c.unitId === currentUser?.unitId);
+      await backupKasMasuk(unitCashIn);
+      toast.success('Kas masuk berhasil di-backup ke Google Sheets!');
+    } catch (error) {
+      toast.error('Gagal backup kas masuk ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
+  };
+
+  const handleBackupExpenses = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      const unitExpenses = expenses.filter(e => e.unitId === currentUser?.unitId);
+      await backupPengeluaran(unitExpenses);
+      toast.success('Pengeluaran berhasil di-backup ke Google Sheets!');
+    } catch (error) {
+      toast.error('Gagal backup pengeluaran ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
+  };
+
+  const handleBackupDebts = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      const unitDebts = debts.filter(d => d.unitId === currentUser?.unitId);
+      await backupPiutang(unitDebts);
+      toast.success('Piutang berhasil di-backup ke Google Sheets!');
+    } catch (error) {
+      toast.error('Gagal backup piutang ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
+  };
+
+  const handleTestConnection = async () => {
+    if (!storeSettings.appsScriptUrl) {
+      toast.error('URL Google Apps Script belum diatur. Silakan atur di halaman Pengaturan.');
+      return;
+    }
+    setIsBackupLoading(true);
+    try {
+      await testConnection();
+      toast.success('Koneksi Google Sheets berhasil!');
+    } catch (error) {
+      toast.error('Gagal terhubung ke Google Sheets');
+    } finally {
+      setIsBackupLoading(false);
+    }
   };
 
   // Stock history export functions
