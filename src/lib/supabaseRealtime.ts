@@ -1,5 +1,6 @@
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+import { supabase, getSupabaseConfig } from './supabaseClient';
 
 // Interface untuk Supabase client
 interface SupabaseClient {
@@ -43,14 +44,16 @@ export const setupRealtimeSubscriptions = async (
   onDataChange: (table: string, payload: any) => void
 ) => {
   try {
-    const supabase = await createSupabaseClient();
     const config = getSupabaseConfig();
     
     if (!config.url || !config.key) {
       console.warn('Supabase not configured, skipping realtime setup');
+      toast.error('Supabase belum dikonfigurasi');
       return null;
     }
 
+    console.log('Setting up Supabase realtime subscriptions...');
+    
     // Subscribe to all table changes
     const channel = supabase
       .channel('db-changes')
@@ -79,12 +82,19 @@ export const setupRealtimeSubscriptions = async (
         }
       )
       .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
         if (status === 'SUBSCRIBED') {
           console.log('Realtime subscription active');
           toast.success('Real-time sync aktif');
         } else if (status === 'CHANNEL_ERROR') {
           console.error('Realtime subscription error');
           toast.error('Gagal mengaktifkan real-time sync');
+        } else if (status === 'TIMED_OUT') {
+          console.error('Realtime subscription timeout');
+          toast.error('Real-time sync timeout');
+        } else if (status === 'CLOSED') {
+          console.warn('Realtime subscription closed');
+          toast.warning('Real-time sync ditutup');
         }
       });
 

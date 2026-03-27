@@ -8,6 +8,7 @@ import AdminDebts from './AdminDebts';
 import AdminCashIn from './AdminCashIn';
 import AdminReports from './AdminReports';
 import SettingsPage from './Settings';
+import SupabaseDebug from './SupabaseDebug';
 
 export default function AdminPage() {
   return (

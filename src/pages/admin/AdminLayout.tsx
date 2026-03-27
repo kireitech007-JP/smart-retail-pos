@@ -3,9 +3,10 @@ import { useApp } from '@/contexts/AppContext';
 import { useSupabaseRealtime } from '@/hooks/useSupabaseRealtime';
 import RealtimeStatus from '@/components/RealtimeStatus';
 import SheetSyncButton from '@/components/SheetSyncButton';
+import SupabaseDebug from '@/components/SupabaseDebug';
 import { 
   LayoutDashboard, Package, Users, Receipt, FileText, Settings, LogOut, 
-  CreditCard, Store, ChevronLeft, ChevronRight, AlertTriangle, Menu, DollarSign
+  CreditCard, Store, ChevronLeft, ChevronRight, AlertTriangle, Menu, DollarSign, Bug
 } from 'lucide-react';
 
 const menuItems = [
@@ -17,6 +18,7 @@ const menuItems = [
   { id: 'cashin', label: 'Kas Masuk', icon: DollarSign },
   { id: 'reports', label: 'Laporan', icon: FileText },
   { id: 'settings', label: 'Pengaturan', icon: Settings },
+  { id: 'debug', label: 'Debug Supabase', icon: Bug },
 ];
 
 interface AdminLayoutProps {
@@ -112,7 +114,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-6">
-          {children(activePage)}
+          {activePage === 'debug' ? (
+            <SupabaseDebug />
+          ) : (
+            children(activePage)
+          )}
         </div>
       </main>
     </div>
