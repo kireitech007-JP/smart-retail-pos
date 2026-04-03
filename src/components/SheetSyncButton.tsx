@@ -9,9 +9,11 @@ import {
   AlertCircle, 
   Clock,
   Upload,
-  Database
+  Database,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useApp } from '@/contexts/AppContext';
 import { 
   autoSyncToSheets, 
   syncTransactionToSheets,
@@ -27,17 +29,28 @@ interface SheetSyncButtonProps {
   data?: any;
   className?: string;
   showStatus?: boolean;
+  openSheetAfterSync?: boolean;
 }
 
 const SheetSyncButton: React.FC<SheetSyncButtonProps> = ({ 
   mode = 'auto', 
   data, 
   className = '',
-  showStatus = true 
+  showStatus = true,
+  openSheetAfterSync = false
 }) => {
+  const { storeSettings } = useApp();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'connected' | 'error'>('idle');
+
+  const handleOpenSheet = () => {
+    if (storeSettings.spreadsheetUrl) {
+      window.open(storeSettings.spreadsheetUrl, '_blank');
+    } else {
+      toast.error('URL Spreadsheet belum diatur di Pengaturan');
+    }
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -91,6 +104,10 @@ const SheetSyncButton: React.FC<SheetSyncButtonProps> = ({
       if (result.success) {
         setLastSync(new Date());
         toast.success(result.message || 'Data berhasil di-sync ke Google Sheets');
+        
+        if (openSheetAfterSync) {
+          handleOpenSheet();
+        }
       } else {
         toast.error(result.error || 'Gagal sync data');
       }
@@ -159,114 +176,42 @@ const SheetSyncButton: React.FC<SheetSyncButtonProps> = ({
 
   const StatusIcon = getModeIcon();
 
-  if (!showStatus) {
-    return (
-      <Button
-        onClick={handleSync}
-        disabled={isSyncing}
-        className={`${className} ${mode === 'auto' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-        size="sm"
-      >
-        {isSyncing ? (
-          <>
-            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-            Syncing...
-          </>
-        ) : (
-          <>
-            <StatusIcon className="w-4 h-4 mr-2" />
-            {getModeLabel()}
-          </>
-        )}
-      </Button>
-    );
-  }
-
   return (
-    <Card className={`${className}`}>
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <StatusIcon className="w-5 h-5 text-green-600" />
-              <span className="font-medium">{getModeLabel()}</span>
-            </div>
-            
-            {lastSync && (
-              <div className="flex items-center text-sm text-muted-foreground">
-                <Clock className="w-3 h-3 mr-1" />
-                Last sync: {formatLastSync(lastSync)}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center space-x-2">
-            {/* Connection Status */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={testConnection}
-              disabled={connectionStatus === 'testing'}
-              className="h-8"
-            >
-              {connectionStatus === 'testing' ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : connectionStatus === 'connected' ? (
-                <CheckCircle className="w-3 h-3 text-green-600" />
-              ) : connectionStatus === 'error' ? (
-                <AlertCircle className="w-3 h-3 text-red-600" />
-              ) : (
-                <Database className="w-3 h-3" />
-              )}
-            </Button>
-
-            {/* Sync Button */}
-            <Button
-              onClick={handleSync}
-              disabled={isSyncing}
-              className={`h-8 ${mode === 'auto' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-              size="sm"
-            >
-              {isSyncing ? (
-                <RefreshCw className="w-3 h-3 animate-spin" />
-              ) : (
-                <StatusIcon className="w-3 h-3" />
-              )}
-            </Button>
-          </div>
-        </div>
-
-        {/* Status Messages */}
-        {connectionStatus === 'connected' && (
-          <div className="mt-2 text-sm text-green-600 flex items-center">
-            <CheckCircle className="w-3 h-3 mr-1" />
-            Terhubung ke Google Sheets
-          </div>
-        )}
+    <div className={`flex flex-col gap-2 ${className}`}>
+      <div className="flex gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleSync} 
+          disabled={isSyncing}
+          className="flex items-center gap-2"
+        >
+          {isSyncing ? (
+            <RefreshCw className="w-4 h-4 animate-spin" />
+          ) : (
+            <FileSpreadsheet className="w-4 h-4" />
+          )}
+          {isSyncing ? 'Syncing...' : 'Sync to Sheets'}
+        </Button>
         
-        {connectionStatus === 'error' && (
-          <div className="mt-2 text-sm text-red-600 flex items-center">
-            <AlertCircle className="w-3 h-3 mr-1" />
-            Gagal terhubung ke Google Sheets
-          </div>
-        )}
-
-        {isSyncing && (
-          <div className="mt-2 text-sm text-blue-600 flex items-center">
-            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-            Sedang mensinkronkan data...
-          </div>
-        )}
-
-        {lastSync && !isSyncing && connectionStatus === 'connected' && (
-          <div className="mt-2 text-sm text-muted-foreground">
-            <Badge variant="secondary" className="text-xs">
-              Terakhir sync: {formatLastSync(lastSync)}
-            </Badge>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleOpenSheet}
+          className="flex items-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Open Sheets
+        </Button>
+      </div>
+      
+      {showStatus && lastSync && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="w-3 h-3" />
+          Last sync: {lastSync.toLocaleTimeString()}
+        </div>
+      )}
+    </div>
   );
 };
 

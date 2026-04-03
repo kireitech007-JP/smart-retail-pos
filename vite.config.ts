@@ -6,11 +6,12 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: "::",
-    port: 8080,
+    host: true, // Allow external connections
+    port: 5173, // Standard Vite port
     hmr: {
-      overlay: false,
+      overlay: true, // Enable error overlay
     },
+    open: true, // Auto-open browser
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
@@ -22,7 +23,7 @@ export default defineConfig(({ mode }) => ({
     outDir: "dist",
     emptyOutDir: true,
     assetsDir: "assets",
-    sourcemap: false,
+    sourcemap: mode === "development", // Enable sourcemap in development
     rollupOptions: {
       output: {
         manualChunks: undefined,
@@ -30,4 +31,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   base: mode === "production" ? "/" : "/",
+  optimizeDeps: {
+    include: ['react', 'react-dom', '@supabase/supabase-js'],
+  },
 }));

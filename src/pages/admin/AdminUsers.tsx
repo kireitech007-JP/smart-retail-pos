@@ -3,12 +3,29 @@ import { useApp } from '@/contexts/AppContext';
 import { Plus, X, Users, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
+import { backupAllData } from '@/lib/googleSheets';
 
 export default function AdminUsers() {
-  const { users, units, addUser, deleteUser, updateUser } = useApp();
+  const { users, units, addUser, deleteUser, updateUser, products, transactions, debts, expenses, cashIns, stockHistory, cashierSessions, storeSettings } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', username: '', password: '', role: 'cashier' as 'admin' | 'cashier', unitId: '' });
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi seluruh data ke Google Sheets...');
+    await backupAllData({
+      products,
+      transactions,
+      debts,
+      expenses,
+      cashIns,
+      users,
+      units,
+      stockHistory,
+      cashierSessions,
+      storeSettings
+    });
+  };
 
   const handleAdd = () => {
     if (!form.name.trim() || !form.username.trim() || !form.password.trim()) { toast.error('Semua field harus diisi'); return; }
@@ -55,7 +72,7 @@ export default function AdminUsers() {
             <h3 className="font-bold text-foreground">Manajemen Pengguna</h3>
           </div>
           <div className="flex items-center gap-2">
-            <ExportButtons data={exportData} filename="pengguna" title="Daftar Pengguna" />
+            <ExportButtons data={exportData} filename="pengguna" title="Daftar Pengguna" onSheetsClick={handleSyncToSheets} />
             <button onClick={() => setShowAdd(true)} className="flex items-center gap-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
               <Plus className="w-4 h-4" /> Tambah Kasir
             </button>

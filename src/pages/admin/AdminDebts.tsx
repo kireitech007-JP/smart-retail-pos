@@ -5,10 +5,16 @@ import { CreditCard, DollarSign, Plus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
+import { backupPiutang } from '@/lib/googleSheets';
 
 export default function AdminDebts() {
   const { debts, units, payDebt, addDebt } = useApp();
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi data piutang ke Google Sheets...');
+    await backupPiutang(debts);
+  };
   const [payAmount, setPayAmount] = useState<{ [key: string]: number }>({});
   const [showAddManual, setShowAddManual] = useState(false);
   const [manualForm, setManualForm] = useState({
@@ -111,7 +117,7 @@ export default function AdminDebts() {
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h3 className="font-bold text-foreground">Daftar Piutang ({unpaid.length})</h3>
           <div className="flex items-center gap-2">
-            <ExportButtons data={exportData} filename="piutang" title="Daftar Piutang" />
+            <ExportButtons data={exportData} filename="piutang" title="Daftar Piutang" onSheetsClick={handleSyncToSheets} />
             <button onClick={() => setShowAddManual(true)} className="flex items-center gap-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
               <Plus className="w-4 h-4" /> Piutang Manual
             </button>

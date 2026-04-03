@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp, Product, Unit } from '@/contexts/AppContext';
 import { formatRupiah, formatDate } from '@/lib/format';
-import { Plus, X, Edit2, Package, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Plus, X, Edit2, Package, AlertTriangle, ChevronDown, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
+import { backupProduk } from '@/lib/googleSheets';
 
 export default function AdminProducts() {
   const { units, products, users, addUnit, deleteUnit, updateUnit, addProduct, updateProduct, deleteProduct, getProductStock } = useApp();
@@ -20,6 +21,11 @@ export default function AdminProducts() {
   const cashiers = users.filter(u => u.role === 'cashier');
   const filteredProducts = selectedUnit === 'all' ? products : products.filter(p => p.unitId === selectedUnit);
   const lowStockProducts = filteredProducts.filter(p => getProductStock(p) <= 5 && getProductStock(p) > 0);
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi data produk ke Google Sheets...');
+    await backupProduk(products);
+  };
 
   const handleAddUnit = () => {
     if (!unitName.trim()) return;
@@ -173,7 +179,7 @@ export default function AdminProducts() {
         <div className="flex items-center justify-between p-6 border-b border-border">
           <h3 className="font-bold text-foreground">Manajemen Produk</h3>
           <div className="flex items-center gap-2">
-            <ExportButtons data={exportData} filename="produk" title="Daftar Produk" />
+            <ExportButtons data={exportData} filename="produk" title="Daftar Produk" onSheetsClick={handleSyncToSheets} />
             <button onClick={() => { setEditProduct(null); setForm({ supplier: '', name: '', unitId: selectedUnit !== 'all' ? selectedUnit : '', satuan: 'pcs', hpp: 0, price: 0, initialStock: 0, addedStock: 0 }); setShowAddProduct(true); }}
               className="flex items-center gap-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium hover:opacity-90">
               <Plus className="w-4 h-4" /> Tambah Produk

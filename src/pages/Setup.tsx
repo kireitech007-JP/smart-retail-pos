@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
-import { Store, User, Lock, ArrowRight } from 'lucide-react';
+import { Store, User, Lock, ArrowRight, Key } from 'lucide-react';
 
 export default function SetupPage() {
   const { completeSetup } = useApp();

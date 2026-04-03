@@ -1,36 +1,17 @@
 import React from 'react';
-import { Download, FileSpreadsheet } from 'lucide-react';
+import { Download, FileSpreadsheet, ExternalLink } from 'lucide-react';
+import { useApp } from '@/contexts/AppContext';
+import { toast } from 'sonner';
 
 interface ExportButtonsProps {
   data: any[];
   filename: string;
   title?: string;
+  onSheetsClick?: () => void;
 }
 
-export default function ExportButtons({ data, filename, title }: ExportButtonsProps) {
-  const exportToCSV = () => {
-    if (!data || data.length === 0) return;
-    
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(header => {
-        const value = row[header];
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value}"`;
-        }
-        return value;
-      }).join(','))
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${filename}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
+export default function ExportButtons({ data, filename, title, onSheetsClick }: ExportButtonsProps) {
+  const { storeSettings } = useApp();
 
   const exportToPDF = () => {
     if (!data || data.length === 0) return;
@@ -154,45 +135,29 @@ export default function ExportButtons({ data, filename, title }: ExportButtonsPr
     };
   };
 
-  const exportToGoogleSheets = () => {
-    if (!data || data.length === 0) return;
+  const openGoogleSheets = () => {
+    if (onSheetsClick) {
+      onSheetsClick();
+    }
     
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(header => {
-        const value = row[header];
-        if (typeof value === 'string' && value.includes(',')) {
-          return `"${value}"`;
-        }
-        return value;
-      }).join(','))
-    ].join('\n');
-    
-    // Create a data URI for the CSV
-    const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-    
-    // Create a temporary link to trigger download
-    const link = document.createElement('a');
-    link.setAttribute('href', dataUri);
-    link.setAttribute('download', `${filename}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Show instructions for Google Sheets
-    alert('CSV file downloaded! You can now:\n1. Open Google Sheets\n2. Click "File" > "Import"\n3. Upload the downloaded CSV file');
+    if (storeSettings.spreadsheetUrl) {
+      window.open(storeSettings.spreadsheetUrl, '_blank');
+      toast.success('Membuka Google Spreadsheet...');
+    } else {
+      toast.error('URL Google Spreadsheet belum diatur di Pengaturan.');
+    }
   };
 
   return (
     <div className="flex items-center gap-2">
       <button
-        onClick={exportToGoogleSheets}
+        onClick={openGoogleSheets}
         className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-        title="Export to Google Sheets (CSV)"
+        title="Lihat di Google Sheets"
       >
         <FileSpreadsheet className="w-4 h-4" />
         Sheets
+        <ExternalLink className="w-3 h-3 ml-0.5 opacity-70" />
       </button>
       <button
         onClick={exportToPDF}

@@ -26,7 +26,7 @@ export default function CashIn() {
   
   // Get cash in history for current session
   const sessionCashIns = activeSession 
-    ? cashIns.filter(c => activeSession.cashIns?.includes(c.id))
+    ? (cashIns || []).filter(c => (activeSession.cashIns || []).includes(c.id))
     : [];
   
   const totalSessionCashIn = sessionCashIns.reduce((sum, c) => sum + c.amount, 0);

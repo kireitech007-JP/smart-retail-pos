@@ -6,7 +6,27 @@ import {
   testRealtimeConnection,
   unsubscribeFromChannel 
 } from '@/lib/supabaseRealtime';
+import { getSupabaseConfig } from '@/lib/supabaseClient';
 import { useApp } from '@/contexts/AppContext';
+
+// Helper function to map Supabase table names to localStorage keys
+const getLocalStorageKey = (table: string): string => {
+  const keyMap: { [key: string]: string } = {
+    'kategori': 'categories',
+    'satuan': 'units',
+    'unit': 'storeUnits',
+    'pengguna': 'users',
+    'produk': 'products',
+    'transaksi': 'transactions',
+    'transaksi_items': 'transactionItems',
+    'piutang': 'debts',
+    'kas_masuk': 'cashIn',
+    'pengeluaran': 'expenses',
+    'sessions': 'sessions'
+  };
+  
+  return keyMap[table] || table;
+};
 
 interface UseSupabaseRealtimeOptions {
   enableAutoSync?: boolean;
@@ -212,35 +232,4 @@ export const useSupabaseRealtime = (options: UseSupabaseRealtimeOptions = {}) =>
       }
     }
   };
-};
-
-// Helper functions
-const getSupabaseConfig = () => {
-  const storeSettings = localStorage.getItem('storeSettings');
-  if (storeSettings) {
-    const settings = JSON.parse(storeSettings);
-    return {
-      url: settings.supabaseUrl || '',
-      key: settings.supabaseKey || ''
-    };
-  }
-  return { url: '', key: '' };
-};
-
-const getLocalStorageKey = (table: string): string => {
-  const keyMap: { [key: string]: string } = {
-    'kategori': 'categories',
-    'satuan': 'units',
-    'unit': 'storeUnits',
-    'pengguna': 'users',
-    'produk': 'products',
-    'transaksi': 'transactions',
-    'transaksi_items': 'transactionItems',
-    'piutang': 'debts',
-    'kas_masuk': 'cashIn',
-    'pengeluaran': 'expenses',
-    'sessions': 'sessions'
-  };
-  
-  return keyMap[table] || table;
 };

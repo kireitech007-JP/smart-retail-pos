@@ -211,12 +211,21 @@ export default function AdminSettings() {
           <Link className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-foreground">Integrasi Google Sheets</h3>
         </div>
-        <div className="p-6">
-          <label className="text-sm font-medium text-foreground mb-1 block">Apps Script URL</label>
-          <input value={form.appsScriptUrl} onChange={e => setForm(f => ({ ...f, appsScriptUrl: e.target.value }))} 
-            placeholder="https://script.google.com/macros/s/..."
-            className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
-          <p className="text-xs text-muted-foreground mt-2">URL Web App dari Google Apps Script untuk sinkronisasi data</p>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">Apps Script URL</label>
+            <input value={form.appsScriptUrl} onChange={e => setForm(f => ({ ...f, appsScriptUrl: e.target.value }))} 
+              placeholder="https://script.google.com/macros/s/..."
+              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+            <p className="text-xs text-muted-foreground mt-2">URL Web App dari Google Apps Script untuk sinkronisasi data</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground mb-1 block">Spreadsheet URL</label>
+            <input value={form.spreadsheetUrl} onChange={e => setForm(f => ({ ...f, spreadsheetUrl: e.target.value }))} 
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+            <p className="text-xs text-muted-foreground mt-2">URL Google Spreadsheet Anda untuk akses cepat</p>
+          </div>
         </div>
       </div>
 

@@ -4,6 +4,41 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Function untuk mengeksekusi SQL query secara dinamis
+-- HATI-HATI: Function ini memberikan akses penuh ke database
+-- Gunakan hanya untuk development dan testing
+CREATE OR REPLACE FUNCTION execute_sql(sql_query TEXT)
+RETURNS TABLE(result JSON)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    query_result RECORD;
+    json_result JSON;
+    error_result JSON;
+BEGIN
+    -- Execute the dynamic SQL query
+    FOR query_result IN EXECUTE sql_query LOOP
+        -- Convert each row to JSON
+        json_result := row_to_json(query_result);
+        RETURN NEXT json_result;
+    END LOOP;
+    
+    RETURN;
+EXCEPTION WHEN OTHERS THEN
+    -- Return error information if query fails
+    error_result := json_build_object(
+        'error', SQLERRM,
+        'sqlstate', SQLSTATE
+    );
+    RETURN NEXT error_result;
+END;
+$$;
+
+-- Grant permission to authenticated users
+GRANT EXECUTE ON FUNCTION execute_sql TO authenticated;
+GRANT EXECUTE ON FUNCTION execute_sql TO service_role;
+
 -- Categories table
 CREATE TABLE IF NOT EXISTS kategori (
   id TEXT PRIMARY KEY,

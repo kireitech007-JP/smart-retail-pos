@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, formatDateTime } from '@/lib/format';
 import { Receipt, Printer, MessageSquare, Download } from 'lucide-react';
+import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
 import PrintButtons from '@/components/PrintButtons';
+import { backupTransaksi } from '@/lib/googleSheets';
 
 export default function AdminTransactions() {
   const { transactions, units } = useApp();
@@ -11,6 +13,11 @@ export default function AdminTransactions() {
 
   const filtered = selectedUnit === 'all' ? transactions : transactions.filter(t => t.unitId === selectedUnit);
   const sorted = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi data transaksi ke Google Sheets...');
+    await backupTransaksi(transactions);
+  };
 
   const handlePrintInvoice = (transaction: any) => {
     const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes,resizable=yes');
@@ -224,7 +231,7 @@ export default function AdminTransactions() {
           <h3 className="font-bold text-foreground">Riwayat Transaksi</h3>
           <div className="ml-auto flex items-center gap-2">
             <PrintButtons transactions={sorted} type="faktur" />
-            <ExportButtons data={exportData} filename="transaksi" title="Riwayat Transaksi" />
+            <ExportButtons data={exportData} filename="transaksi" title="Riwayat Transaksi" onSheetsClick={handleSyncToSheets} />
             <span className="text-sm text-muted-foreground">{sorted.length} transaksi</span>
           </div>
         </div>

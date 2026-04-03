@@ -3,12 +3,19 @@ import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, isToday, isThisWeek, isThisMonth } from '@/lib/format';
 import { FileText, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
+import { backupLaporan } from '@/lib/googleSheets';
 
 export default function AdminReports() {
   const { transactions, expenses, units } = useApp();
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi data laporan ke Google Sheets...');
+    await backupLaporan(chartData);
+  };
 
   const filterByPeriod = (date: string) => {
     if (period === 'daily') return isToday(date);
@@ -86,7 +93,7 @@ export default function AdminReports() {
             <BarChart3 className="w-5 h-5 text-primary" />
             <h3 className="font-bold text-foreground">Laporan Per Unit ({periodLabels[period]})</h3>
           </div>
-          <ExportButtons data={exportData} filename={`laporan-${periodLabels[period].toLowerCase()}`} title={`Laporan ${periodLabels[period]}`} />
+          <ExportButtons data={exportData} filename={`laporan-${periodLabels[period].toLowerCase()}`} title={`Laporan ${periodLabels[period]}`} onSheetsClick={handleSyncToSheets} />
         </div>
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>

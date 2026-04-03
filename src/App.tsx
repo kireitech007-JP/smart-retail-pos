@@ -9,6 +9,7 @@ import SetupPage from "@/pages/Setup";
 import LoginPage from "@/pages/Login";
 import AdminPage from "@/pages/admin/AdminPage";
 import CashierPOS from "@/pages/cashier/CashierPOS";
+import SqlEditorPage from "@/pages/SqlEditorPage";
 
 const queryClient = new QueryClient();
 
@@ -66,10 +67,10 @@ function AppContent() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center bg-blue-500">
+        <div className="text-center text-white">
+          <div className="w-12 h-12 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="font-bold">INITIALIZING APP...</p>
         </div>
       </div>
     );
@@ -103,39 +104,39 @@ function AppContent() {
     );
   }
 
-  console.log('Rendering component:', { isSetup, currentUser });
-
   if (!isSetup) {
-    console.log('Rendering SetupPage');
     return <SetupPage />;
   }
   
   if (!currentUser) {
-    console.log('Rendering LoginPage');
     return <LoginPage />;
   }
   
+  if (currentUser.role === 'superadmin') {
+    return <SqlEditorPage />;
+  }
+  
   if (currentUser.role === 'admin') {
-    console.log('Rendering AdminPage');
     return <AdminPage />;
   }
   
-  console.log('Rendering CashierPOS');
   return <CashierPOS />;
 }
 
-const App = () => (
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AppProvider>
-          <AppContent />
-        </AppProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>
-);
+const App = () => {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
+  );
+};
 
 export default App;

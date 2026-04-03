@@ -10,11 +10,19 @@ import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
 import PrintButtons from '@/components/PrintButtons';
 
+import { 
+  backupAllData, 
+  backupTransaksi,
+  backupKasMasuk,
+  backupPengeluaran,
+  backupPiutang
+} from '@/lib/googleSheets';
+
 export default function CashierDashboard() {
   const { 
     currentUser, units, transactions, expenses, debts, payDebt, 
     openCashierSession, closeCashierSession, getActiveSession, cashierSessions,
-    cashIns, getProductStock, products, storeSettings
+    cashIns, getProductStock, products, storeSettings, stockHistory
   } = useApp();
 
   const [openingCash, setOpeningCash] = useState(0);
@@ -25,12 +33,31 @@ export default function CashierDashboard() {
   const [showExportModal, setShowExportModal] = useState(false);
 
   const activeSession = currentUser ? getActiveSession(currentUser.id) : null;
-  const userUnit = units.find(u => u.id === currentUser?.unitId);
+  const userUnit = (units || []).find(u => u.id === currentUser?.unitId);
 
   // Handle functions
-  const handleExportToGoogleSheets = () => {
-    // Export logic here
-    toast.success('Data dikirim ke Google Sheets');
+  const handleExportToGoogleSheets = async () => {
+    if (!storeSettings.spreadsheetUrl) {
+      toast.error('URL Spreadsheet belum diatur di Pengaturan');
+      return;
+    }
+    
+    toast.info('Sinkronisasi data ke Google Sheets...');
+    await backupAllData({
+      products,
+      transactions,
+      debts,
+      expenses,
+      cashIns,
+      users: [],
+      units,
+      stockHistory,
+      cashierSessions,
+      storeSettings
+    });
+    
+    window.open(storeSettings.spreadsheetUrl, '_blank');
+    toast.success('Membuka Google Spreadsheet...');
   };
 
   const handleExportToPDF = () => {
@@ -142,17 +169,17 @@ Terima Kasih!`;
   const todayData = useMemo(() => {
     const today = new Date().toDateString();
     
-    const sessionTx = activeSession ? transactions.filter(t => 
-      activeSession.transactions.includes(t.id)
-    ) : transactions.filter(t => isToday(t.date) && t.unitId === userUnit?.id);
+    const sessionTx = activeSession ? (transactions || []).filter(t => 
+      (activeSession.transactions || []).includes(t.id)
+    ) : (transactions || []).filter(t => isToday(t.date) && t.unitId === userUnit?.id);
     
-    const sessionExp = activeSession ? expenses.filter(e => 
-      activeSession.expenses.includes(e.id)
-    ) : expenses.filter(e => isToday(e.date) && e.unitId === userUnit?.id);
+    const sessionExp = activeSession ? (expenses || []).filter(e => 
+      (activeSession.expenses || []).includes(e.id)
+    ) : (expenses || []).filter(e => isToday(e.date) && e.unitId === userUnit?.id);
     
-    const sessionCashIn = activeSession ? cashIns.filter(c => 
-      activeSession.cashIns?.includes(c.id)
-    ) : cashIns.filter(c => isToday(c.date) && c.unitId === userUnit?.id);
+    const sessionCashIn = activeSession ? (cashIns || []).filter(c => 
+      (activeSession.cashIns || []).includes(c.id)
+    ) : (cashIns || []).filter(c => isToday(c.date) && c.unitId === userUnit?.id);
 
     // Group transactions by payment type
     const cashTransactions = sessionTx.filter(t => t.paymentType === 'cash');
@@ -165,22 +192,22 @@ Terima Kasih!`;
     const creditInstallment = creditTransactions.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.grandTotal - (t.dp || 0)), 0);
 
     // Get debt payments today
-    const paidDebts = debts.filter(d => 
+    const paidDebts = (debts || []).filter(d => 
       d.unitId === userUnit?.id && 
-      d.payments?.some(p => isToday(p.date))
+      (d.payments || []).some(p => isToday(p.date))
     );
 
     const totalPaidToday = paidDebts.reduce((sum, d) => {
-      const todayPayments = d.payments?.filter(p => isToday(p.date)) || [];
+      const todayPayments = (d.payments || []).filter(p => isToday(p.date)) || [];
       return sum + todayPayments.reduce((ps, p) => ps + p.amount, 0);
     }, 0);
 
-    const totalCash = cashTransactions.reduce((sum, t) => sum + t.grandTotal, 0);
-    const totalTransfer = transferTransactions.reduce((sum, t) => sum + t.grandTotal, 0);
-    const totalExpenses = sessionExp.reduce((sum, e) => sum + e.amount, 0);
-    const totalCashIn = sessionCashIn.reduce((sum, c) => sum + c.amount, 0);
+    const totalCash = cashTransactions.reduce((sum, t) => sum + (t.grandTotal || 0), 0);
+    const totalTransfer = transferTransactions.reduce((sum, t) => sum + (t.grandTotal || 0), 0);
+    const totalExpenses = sessionExp.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalCashIn = sessionCashIn.reduce((sum, c) => sum + (c.amount || 0), 0);
 
-    const expectedCash = (activeSession?.openingCash || openingCash) + totalCash + totalCashIn + totalPaidToday - totalExpenses;
+    const expectedCash = (activeSession?.openingCash || openingCash || 0) + totalCash + totalCashIn + totalPaidToday - totalExpenses;
 
     // Create comprehensive transaction history
     const allTransactions = [
@@ -190,16 +217,16 @@ Terima Kasih!`;
         date: t.date,
         type: 'transaction' as const,
         description: `Penjualan ${t.paymentType === 'cash' ? 'Tunai' : t.paymentType === 'transfer' ? 'Transfer' : 'Kredit'} - ${t.customerName}`,
-        amount: t.grandTotal,
+        amount: t.grandTotal || 0,
         customerName: t.customerName,
         paymentType: t.paymentType,
-        grandTotal: t.grandTotal,
-        total: t.total,
-        subtotal: t.total, // Map total to subtotal for compatibility
-        items: t.items,
-        dp: t.dp,
-        tax: t.tax,
-        discount: t.discount,
+        grandTotal: t.grandTotal || 0,
+        total: t.total || 0,
+        subtotal: t.total || 0, // Map total to subtotal for compatibility
+        items: t.items || [],
+        dp: t.dp || 0,
+        tax: t.tax || 0,
+        discount: t.discount || 0,
         cashierName: t.cashierName
       })),
       // Cash In transactions
@@ -208,7 +235,7 @@ Terima Kasih!`;
         date: c.date,
         type: 'cashin' as const,
         description: `Kas Masuk - ${c.depositorName}`,
-        amount: c.amount,
+        amount: c.amount || 0,
         depositorName: c.depositorName,
         details: c.description
       })),
@@ -218,7 +245,7 @@ Terima Kasih!`;
         date: e.date,
         type: 'expense' as const,
         description: `Pengeluaran - ${e.description}`,
-        amount: -e.amount, // Negative for expenses
+        amount: -(e.amount || 0), // Negative for expenses
         details: e.description
       })),
       // Debt payments
@@ -228,7 +255,7 @@ Terima Kasih!`;
           date: p.date,
           type: 'debt_payment' as const,
           description: `Pelunasan Piutang - ${d.customerName}`,
-          amount: p.amount,
+          amount: p.amount || 0,
           customerName: d.customerName,
           originalDebtId: d.id
         }))
@@ -236,7 +263,7 @@ Terima Kasih!`;
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     return {
-      openingCash: activeSession?.openingCash || openingCash,
+      openingCash: activeSession?.openingCash || openingCash || 0,
       totalCash,
       totalTransfer,
       creditDP,
@@ -254,12 +281,12 @@ Terima Kasih!`;
   const filteredTransactions = useMemo(() => {
     if (!searchQuery) return todayData.allTransactions;
     const q = searchQuery.toLowerCase();
-    return todayData.allTransactions.filter(t => 
+    return (todayData.allTransactions || []).filter(t => 
       t.description?.toLowerCase().includes(q) ||
       t.id.toLowerCase().includes(q) ||
       ('customerName' in t && t.customerName?.toLowerCase().includes(q)) ||
       ('depositorName' in t && t.depositorName?.toLowerCase().includes(q)) ||
-      ('items' in t && t.items > 0) // For transactions with items
+      ('items' in t && Array.isArray(t.items) && t.items.length > 0)
     );
   }, [todayData.allTransactions, searchQuery]);
 

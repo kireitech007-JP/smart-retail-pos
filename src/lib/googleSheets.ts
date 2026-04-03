@@ -1,5 +1,4 @@
 import { toast } from 'sonner';
-import { useApp } from '@/contexts/AppContext';
 
 // Interface untuk Google Sheets response
 interface GoogleSheetsResponse {
@@ -117,6 +116,10 @@ export const backupPiutang = async (piutang: any[]): Promise<GoogleSheetsRespons
 
 export const backupKasMasuk = async (kasMasuk: any[]): Promise<GoogleSheetsResponse> => {
   return sendToGoogleSheets('backupKasMasuk', { kasMasuk });
+};
+
+export const backupStockHistory = async (stockHistory: any[]): Promise<GoogleSheetsResponse> => {
+  return sendToGoogleSheets('backupStockHistory', { stockHistory });
 };
 
 export const backupPengeluaran = async (pengeluaran: any[]): Promise<GoogleSheetsResponse> => {

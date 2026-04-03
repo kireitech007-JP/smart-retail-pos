@@ -3,12 +3,19 @@ import { useApp } from '@/contexts/AppContext';
 import { formatRupiah, formatDate } from '@/lib/format';
 import { DollarSign, TrendingUp, Calendar, Filter } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { toast } from 'sonner';
 import ExportButtons from '@/components/ExportButtons';
+import { backupKasMasuk } from '@/lib/googleSheets';
 
 export default function AdminCashIn() {
   const { cashIns, units, users } = useApp();
   const [selectedUnit, setSelectedUnit] = useState<string>('all');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'all'>('today');
+
+  const handleSyncToSheets = async () => {
+    toast.info('Sinkronisasi data kas masuk ke Google Sheets...');
+    await backupKasMasuk(cashIns);
+  };
 
   const filterByPeriod = (date: string) => {
     const now = new Date();
@@ -111,7 +118,7 @@ export default function AdminCashIn() {
             <TrendingUp className="w-5 h-5 text-primary" />
             <h3 className="font-bold text-foreground">Grafik Kas Masuk Per Unit</h3>
           </div>
-          <ExportButtons data={exportData} filename="kas-masuk" title="Laporan Kas Masuk" />
+          <ExportButtons data={exportData} filename="kas-masuk" title="Laporan Kas Masuk" onSheetsClick={handleSyncToSheets} />
         </div>
         {chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height={300}>

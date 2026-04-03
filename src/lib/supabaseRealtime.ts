@@ -13,29 +13,15 @@ interface SupabaseConfig {
   key: string;
 }
 
-// Fungsi untuk mendapatkan Supabase config
-const getSupabaseConfig = (): SupabaseConfig => {
-  const storeSettings = localStorage.getItem('storeSettings');
-  if (storeSettings) {
-    const settings = JSON.parse(storeSettings);
-    return {
-      url: settings.supabaseUrl || '',
-      key: settings.supabaseKey || ''
-    };
-  }
-  return { url: '', key: '' };
-};
-
 // Fungsi untuk membuat Supabase client
 const createSupabaseClient = () => {
   const config = getSupabaseConfig();
-  if (!config.url || !config.key) {
-    throw new Error('Supabase config not found');
-  }
+  const url = config.url || 'https://placeholder.supabase.co';
+  const key = config.key || 'placeholder';
   
   // Import Supabase dynamically
   return import('@supabase/supabase-js').then(({ createClient }) => {
-    return createClient(config.url, config.key);
+    return createClient(url, key);
   });
 };
 
@@ -46,9 +32,8 @@ export const setupRealtimeSubscriptions = async (
   try {
     const config = getSupabaseConfig();
     
-    if (!config.url || !config.key) {
-      console.warn('Supabase not configured, skipping realtime setup');
-      toast.error('Supabase belum dikonfigurasi');
+    if (!config.url || !config.key || !config.url.startsWith('http')) {
+      console.warn('Supabase not configured correctly, skipping realtime setup');
       return null;
     }
 

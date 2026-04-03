@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Database, Wifi, WifiOff, RefreshCw, Check, X, AlertTriangle, Key, Globe, Mail, Save, Link } from 'lucide-react';
+import { Cloud, Database, Wifi, WifiOff, RefreshCw, Check, X, AlertTriangle, Key, Globe, Mail, Save, Link, FileText } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { toast } from 'sonner';
 
@@ -102,7 +102,7 @@ export default function CloudSettings() {
           <div>
             <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
               <Link className="w-4 h-4" />
-              URL Google Sheets
+              Apps Script URL
             </label>
             <input
               type="url"
@@ -112,6 +112,20 @@ export default function CloudSettings() {
               className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <p className="text-xs text-muted-foreground mt-2">URL Web App dari Google Apps Script untuk sinkronisasi data</p>
+          </div>
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Spreadsheet URL
+            </label>
+            <input
+              type="url"
+              value={storeSettings?.spreadsheetUrl || ''}
+              onChange={(e) => updateStoreSettings({ spreadsheetUrl: e.target.value })}
+              placeholder="https://docs.google.com/spreadsheets/d/..."
+              className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="text-xs text-muted-foreground mt-2">URL Google Spreadsheet Anda untuk akses cepat via tombol Sheets</p>
           </div>
         </div>
       </div>

@@ -7,7 +7,7 @@ import { formatRupiah, formatDateTime } from '@/lib/format';
 import { 
   ShoppingCart, Plus, Minus, X, Search, DollarSign, CreditCard, Banknote, 
   Receipt, Package, LogOut, Store, Wallet, TrendingDown, FileText, 
-  Printer, Download, MessageSquare, Clock, AlertTriangle, Cloud, Database
+  Printer, Download, MessageSquare, Clock, AlertTriangle, Cloud
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CashIn from '@/components/CashIn';
@@ -21,7 +21,9 @@ import {
   backupTransaksiItems,
   backupKasMasuk,
   backupPengeluaran,
-  backupPiutang
+  backupPiutang,
+  backupStockHistory,
+  backupLaporan
 } from '@/lib/googleSheets';
 
 export default function CashierPOS() {
@@ -29,7 +31,7 @@ export default function CashierPOS() {
     currentUser, products, units, cart, addToCart, removeFromCart, clearCart, updateCartQty,
     submitTransaction, addDebt, addExpense, logout, getProductStock, storeSettings,
     openCashierSession, closeCashierSession, getActiveSession, cashierSessions,
-    transactions, expenses, debts, payDebt, cashIns
+    transactions, expenses, debts, payDebt, cashIns, addStock, stockHistory
   } = useApp();
 
   // Enable Supabase Realtime untuk sync antar perangkat
@@ -68,18 +70,8 @@ export default function CashierPOS() {
   const [openingCash, setOpeningCash] = useState(0);
   const invoiceRef = useRef<HTMLDivElement>(null);
 
-  // Add product state
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    sku: '',
-    price: 0,
-    hpp: 0,
-    stock: 0,
-    minStock: 0,
-    categoryId: '',
-    unitId: '',
-    supplier: ''
-  });
+  // Kilogram cart state
+  const [kgCartItems, setKgCartItems] = useState<any[]>([]);
 
   // Add stock state for existing products
   const [addStockProduct, setAddStockProduct] = useState({
@@ -96,22 +88,6 @@ export default function CashierPOS() {
     description: '',
     date: new Date().toISOString()
   });
-
-  // Stock addition history
-  const [stockHistory, setStockHistory] = useState<Array<{
-    id: string;
-    productId: string;
-    productName: string;
-    addedStock: number;
-    oldStock: number;
-    newStock: number;
-    notes: string;
-    date: string;
-    cashierName: string;
-  }>>([]);
-
-  // Real-time stock tracking
-  const [realTimeStock, setRealTimeStock] = useState<{[key: string]: number}>({});
 
   // Edit stock state
   const [showEditStock, setShowEditStock] = useState(false);
@@ -131,23 +107,23 @@ export default function CashierPOS() {
   const [showDebtInvoice, setShowDebtInvoice] = useState(false);
   const [showDebtExportModal, setShowDebtExportModal] = useState(false);
 
-  const userUnit = units.find(u => u.id === currentUser?.unitId);
+  const userUnit = (units || []).find(u => u.id === currentUser?.unitId);
   const activeSession = currentUser ? getActiveSession(currentUser.id) : undefined;
 
   const unitProducts = useMemo(() => {
-    return products.filter(p => p.unitId === currentUser?.unitId);
+    return (products || []).filter(p => p.unitId === currentUser?.unitId);
   }, [products, currentUser]);
 
   const filteredProducts = useMemo(() => {
-    let filtered = unitProducts;
+    let filtered = unitProducts || [];
     
     // Filter by search query
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(p => 
         p.name.toLowerCase().includes(q) || 
-        p.supplier.toLowerCase().includes(q) ||
-        p.sku.toLowerCase().includes(q)
+        (p.supplier || '').toLowerCase().includes(q) ||
+        (p.sku || '').toLowerCase().includes(q)
       );
     }
     
@@ -160,8 +136,8 @@ export default function CashierPOS() {
   }, [unitProducts, searchQuery, selectedUnit]);
 
   const cartItems = useMemo(() => {
-    return cart.map(c => {
-      const product = products.find(p => p.id === c.productId);
+    return (cart || []).map(c => {
+      const product = (products || []).find(p => p.id === c.productId);
       return product ? { ...c, product } : null;
     }).filter(Boolean) as { productId: string; qty: number; product: Product }[];
   }, [cart, products]);
@@ -201,37 +177,13 @@ export default function CashierPOS() {
       return;
     }
 
-    // Get current stock (from real-time tracking or original)
-    const currentStock = realTimeStock[addStockProduct.productId] || selectedProduct.stock || 0;
-    const newStock = currentStock + addStockProduct.additionalStock;
-    
-    // Update real-time stock
-    setRealTimeStock(prev => ({
-      ...prev,
-      [addStockProduct.productId]: newStock
-    }));
-    
-    // Add to history
-    const historyEntry = {
-      id: 'stock_' + Date.now(),
-      productId: selectedProduct.id,
-      productName: selectedProduct.name,
-      addedStock: addStockProduct.additionalStock,
-      oldStock: currentStock,
-      newStock: newStock,
-      notes: addStockProduct.notes,
-      date: new Date().toISOString(),
-      cashierName: currentUser?.name || 'Unknown'
-    };
-    
-    setStockHistory(prev => [historyEntry, ...prev]);
-    
-    console.log('Stock updated for product:', selectedProduct.name, {
-      oldStock: currentStock,
-      additionalStock: addStockProduct.additionalStock,
-      newStock: newStock,
-      notes: addStockProduct.notes
-    });
+    // Use addStock from AppContext
+    addStock(
+      addStockProduct.productId,
+      addStockProduct.additionalStock,
+      addStockProduct.notes,
+      currentUser?.name || 'Unknown'
+    );
 
     // Reset form
     setAddStockProduct({
@@ -518,36 +470,19 @@ export default function CashierPOS() {
   };
 
   // Stock history export functions
-  const handleExportStockHistoryToGoogleSheets = () => {
-    if (!storeSettings.appsScriptUrl || stockHistory.length === 0) {
-      toast.error('URL Google Sheets belum diatur atau tidak ada data riwayat');
+  const handleExportStockHistoryToGoogleSheets = async () => {
+    if (stockHistory.length === 0) return;
+    
+    if (!storeSettings.spreadsheetUrl) {
+      toast.error('URL Spreadsheet belum diatur di Pengaturan');
       return;
     }
 
-    const stockData = stockHistory.map(entry => ({
-      'Tanggal': formatDateTime(entry.date),
-      'Kasir': entry.cashierName,
-      'Nama Produk': entry.productName,
-      'Stok Sebelumnya': entry.oldStock,
-      'Stok Ditambahkan': entry.addedStock,
-      'Stok Setelah': entry.newStock,
-      'Catatan': entry.notes || '-',
-      'Unit': userUnit?.name || '-'
-    }));
-
-    fetch(storeSettings.appsScriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'stock_history',
-        data: stockData
-      }),
-    }).catch(() => {
-      toast.success('Data riwayat stok dikirim ke Google Sheets');
-    });
-
-    toast.success('Mengirim data ke Google Sheets...');
+    toast.info('Sinkronisasi riwayat stok ke Google Sheets...');
+    await backupStockHistory(stockHistory);
+    
+    window.open(storeSettings.spreadsheetUrl, '_blank');
+    toast.success('Membuka Google Spreadsheet...');
   };
 
   const handleExportStockHistoryToPDF = () => {
@@ -645,7 +580,8 @@ export default function CashierPOS() {
 
   // Edit stock functions
   const handleEditStock = (entry: any) => {
-    const currentStock = realTimeStock[entry.productId] || getProductStock(products.find(p => p.id === entry.productId));
+    const product = products.find(p => p.id === entry.productId);
+    const currentStock = product ? getProductStock(product) : 0;
     setEditingStock({
       id: entry.id,
       productId: entry.productId,
@@ -665,31 +601,18 @@ export default function CashierPOS() {
       return;
     }
 
-    const oldStock = realTimeStock[editingStock.productId] || getProductStock(selectedProduct);
+    const oldStock = getProductStock(selectedProduct);
     const newStock = editingStock.currentStock;
     const stockDifference = newStock - oldStock;
     
-    // Update real-time stock
-    setRealTimeStock(prev => ({
-      ...prev,
-      [editingStock.productId]: newStock
-    }));
-    
-    // Add to history if stock changed
+    // Use addStock from context if stock changed
     if (stockDifference !== 0) {
-      const historyEntry = {
-        id: 'stock_edit_' + Date.now(),
-        productId: selectedProduct.id,
-        productName: selectedProduct.name,
-        addedStock: stockDifference,
-        oldStock: oldStock,
-        newStock: newStock,
-        notes: `Edit stok: ${editingStock.notes}`,
-        date: new Date().toISOString(),
-        cashierName: currentUser?.name || 'Unknown'
-      };
-      
-      setStockHistory(prev => [historyEntry, ...prev]);
+      addStock(
+        selectedProduct.id,
+        stockDifference,
+        `Koreksi stok: ${editingStock.notes}`,
+        currentUser?.name || 'Unknown'
+      );
     }
     
     // Reset form
@@ -869,12 +792,12 @@ Simpan bukti ini sebagai referensi Anda.`;
   };
 
   // Session report data
-  const sessionTx = activeSession ? transactions.filter(t => activeSession.transactions.includes(t.id)) : [];
-  const sessionExp = activeSession ? expenses.filter(e => activeSession.expenses.includes(e.id)) : [];
-  const sessionCashIn = activeSession ? cashIns.filter(c => activeSession.cashIns?.includes(c.id)) : [];
-  const sessionSales = sessionTx.reduce((s, t) => s + t.grandTotal, 0);
-  const sessionExpTotal = sessionExp.reduce((s, e) => s + e.amount, 0);
-  const sessionCashInTotal = sessionCashIn.reduce((s, c) => s + c.amount, 0);
+  const sessionTx = activeSession ? (transactions || []).filter(t => (activeSession.transactions || []).includes(t.id)) : [];
+  const sessionExp = activeSession ? (expenses || []).filter(e => (activeSession.expenses || []).includes(e.id)) : [];
+  const sessionCashIn = activeSession ? (cashIns || []).filter(c => (activeSession.cashIns || []).includes(c.id)) : [];
+  const sessionSales = sessionTx.reduce((s, t) => s + (t.grandTotal || 0), 0);
+  const sessionExpTotal = sessionExp.reduce((s, e) => s + (e.amount || 0), 0);
+  const sessionCashInTotal = sessionCashIn.reduce((s, c) => s + (c.amount || 0), 0);
 
   // Prepare export data for cashier session report
   const sessionReportData: any[] = useMemo(() => {
@@ -884,21 +807,21 @@ Simpan bukti ini sebagai referensi Anda.`;
       {
         'Tanggal': formatDateTime(new Date().toISOString()),
         'Kasir': currentUser?.name || '',
-        'Unit': units.find(u => u.id === activeSession.unitId)?.name || '',
+        'Unit': (units || []).find(u => u.id === activeSession.unitId)?.name || '',
         'Sesi ID': activeSession.id.slice(-6).toUpperCase(),
         'Waktu Buka': formatDateTime(activeSession.startTime),
-        'Modal Awal': activeSession.openingCash,
+        'Modal Awal': activeSession.openingCash || 0,
         'Total Penjualan': sessionSales,
         'Total Kas Masuk': sessionCashInTotal,
         'Total Pengeluaran': sessionExpTotal,
-        'Saldo Akhir': activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
+        'Saldo Akhir': (activeSession.openingCash || 0) + sessionSales + sessionCashInTotal - sessionExpTotal,
         'Jumlah Transaksi': sessionTx.length
       }
     ];
 
     // Add transaction details
-    sessionTx.forEach((tx, index) => {
-      const items = tx.items.map(item => 
+    sessionTx.forEach((tx) => {
+      const items = (tx.items || []).map(item => 
         `${item.productName} x${item.qty} = ${formatRupiah(item.subtotal)}`
       ).join(', ');
       
@@ -910,7 +833,7 @@ Simpan bukti ini sebagai referensi Anda.`;
           'Pelanggan': tx.customerName || 'Umum',
           'Metode Pembayaran': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
           'DP': tx.dp || 0,
-          'Total': tx.grandTotal,
+          'Total': tx.grandTotal || 0,
           'Detail Produk': items,
           'Kasir': tx.cashierName
         },
@@ -919,7 +842,7 @@ Simpan bukti ini sebagai referensi Anda.`;
           'Tipe': 'Pembayaran',
           'ID': tx.id.slice(-6).toUpperCase(),
           'Metode': tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit',
-          'Jumlah': tx.grandTotal,
+          'Jumlah': tx.grandTotal || 0,
           'DP': tx.dp || 0,
           'Sisa': tx.paymentType === 'credit' && tx.dp ? tx.grandTotal - tx.dp : 0,
           'Pelanggan': tx.customerName || 'Umum'
@@ -951,7 +874,7 @@ Simpan bukti ini sebagai referensi Anda.`;
     });
 
     // Add debt payment details
-    const debtPayments = debts
+    const debtPayments = (debts || [])
       .filter(d => d.unitId === activeSession.unitId)
       .flatMap(d => 
         (d.payments || [])
@@ -964,7 +887,7 @@ Simpan bukti ini sebagai referensi Anda.`;
           }))
       );
 
-    debtPayments.forEach((payment, idx) => {
+    debtPayments.forEach((payment) => {
       reportData.push({
         'Tanggal': formatDateTime(payment.date),
         'Tipe': 'Pelunasan Piutang',
@@ -996,365 +919,372 @@ Simpan bukti ini sebagai referensi Anda.`;
   }
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <header className="h-14 bg-card border-b border-border flex items-center justify-between px-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center">
-            <Store className="w-4 h-4 text-primary-foreground" />
+    <div className="h-screen flex bg-background overflow-hidden">
+      {/* Sidebar Navigation */}
+      <aside className="w-64 sidebar-gradient border-r border-sidebar-border flex flex-col flex-shrink-0 z-20">
+        <div className="p-6 border-b border-sidebar-border flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center shadow-lg shadow-primary/20">
+            <Store className="w-6 h-6 text-primary-foreground" />
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-foreground">POS KASIR PRO</h1>
-            <p className="text-xs text-muted-foreground">{currentUser?.name} • {userUnit?.name}</p>
+          <div className="min-w-0">
+            <h1 className="text-sm font-black text-primary-foreground tracking-tight">POS KASIR PRO</h1>
+            <p className="text-[10px] text-sidebar-fg/60 font-medium truncate uppercase tracking-wider">{userUnit?.name || 'STORE'}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <RealtimeStatus onManualSync={manualSync} isConnected={isConnected} />
-          <SheetSyncButton mode="auto" showStatus={false} className="mr-2" />
-          {['dashboard', 'cashin', 'pos', 'expense', 'debt'].map(page => {
-            console.log('Rendering menu item:', page, 'activePage:', activePage);
-            return (
-              <button key={page} onClick={() => {
-                console.log('Clicked menu:', page);
-                setActivePage(page as any);
-              }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activePage === page ? 'primary-gradient text-primary-foreground' : 'text-muted-foreground hover:bg-muted'}`}>
-                {page === 'dashboard' ? 'Dashboard' : page === 'cashin' ? 'Kas Masuk' : page === 'pos' ? 'Kasir' : page === 'expense' ? 'Pengeluaran' : 'Piutang'}
+
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {[
+            { id: 'dashboard', label: 'Dashboard', icon: Wallet },
+            { id: 'pos', label: 'Kasir', icon: ShoppingCart },
+            { id: 'cashin', label: 'Kas Masuk', icon: DollarSign },
+            { id: 'expense', label: 'Pengeluaran', icon: TrendingDown },
+            { id: 'debt', label: 'Piutang', icon: CreditCard },
+          ].map(item => (
+            <button 
+              key={item.id} 
+              onClick={() => setActivePage(item.id as any)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200
+                ${activePage === item.id 
+                  ? 'bg-sidebar-active text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
+                  : 'text-sidebar-fg hover:bg-sidebar-hover hover:scale-[1.01]'}`}
+            >
+              <item.icon className={`w-5 h-5 ${activePage === item.id ? 'text-primary-foreground' : 'text-sidebar-fg/70'}`} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-4 border-t border-sidebar-border space-y-2 bg-black/5">
+          <div className="px-4 py-3 rounded-xl bg-sidebar-hover/50 mb-2">
+            <p className="text-[10px] text-sidebar-fg/40 font-bold uppercase tracking-widest mb-1">Kasir Aktif</p>
+            <p className="text-sm font-bold text-sidebar-fg truncate">{currentUser?.name}</p>
+          </div>
+          
+          <button onClick={() => setShowCashierClose(true)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-destructive bg-destructive/10 hover:bg-destructive/20 transition-all">
+            <Clock className="w-5 h-5" />
+            <span>Tutup Kasir</span>
+          </button>
+          
+          <button onClick={logout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-sidebar-fg hover:bg-sidebar-hover transition-all">
+            <LogOut className="w-5 h-5" />
+            <span>Keluar</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6 flex-shrink-0 z-10">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-black text-foreground tracking-tight capitalize">
+              {activePage === 'pos' ? 'Kasir' : activePage === 'cashin' ? 'Kas Masuk' : activePage === 'expense' ? 'Pengeluaran' : activePage === 'debt' ? 'Piutang' : 'Dashboard'}
+            </h2>
+            <div className="h-4 w-[1px] bg-border mx-2"></div>
+            <RealtimeStatus onManualSync={manualSync} isConnected={isConnected} />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <SheetSyncButton mode="auto" showStatus={false} />
+            
+            <div className="flex items-center gap-2 bg-muted/30 p-1 rounded-xl border border-border">
+              <button onClick={handleTestConnection} disabled={isBackupLoading} className="px-3 py-2 rounded-lg text-xs font-bold bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 disabled:opacity-50 transition-all">
+                <Cloud className="w-3.5 h-3.5 inline mr-1.5" />{isBackupLoading ? 'TEST...' : 'TEST'}
               </button>
-            );
-          })}
-          <button onClick={handleTestConnection} disabled={isBackupLoading} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-500/10 text-purple-700 hover:bg-purple-500/20 disabled:opacity-50">
-            <Database className="w-3 h-3 inline mr-1" />{isBackupLoading ? 'Testing...' : 'Test'}
-          </button>
-          <button onClick={handleBackupAll} disabled={isBackupLoading} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 disabled:opacity-50">
-            <Cloud className="w-3 h-3 inline mr-1" />{isBackupLoading ? 'Backup...' : 'Backup'}
-          </button>
-          <button onClick={() => setShowCashierClose(true)} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20">
-            <Clock className="w-3 h-3 inline mr-1" />Tutup Kasir
-          </button>
-          <button onClick={logout} className="p-2 rounded-lg hover:bg-muted"><LogOut className="w-4 h-4 text-muted-foreground" /></button>
-        </div>
-      </header>
-
-      {/* Top Footer - Add Stock Button */}
-      <div className="bg-card border-b border-border px-4 py-2 flex-shrink-0">
-        <button 
-          onClick={() => setShowAddProduct(true)}
-          className="px-4 py-2 primary-gradient text-primary-foreground rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          Tambah Stok Produk
-        </button>
-      </div>
-
-      {activePage === 'dashboard' && (
-        <div className="flex-1 overflow-y-auto">
-          <CashierDashboard />
-        </div>
-      )}
-
-      {activePage === 'cashin' && (
-        <div className="flex-1 p-6 overflow-y-auto">
-          <CashIn />
-        </div>
-      )}
-
-      {activePage === 'pos' && (
-        <div className="flex-1 flex overflow-hidden">
-          {/* Products */}
-          <div className="flex-1 flex flex-col overflow-hidden p-4">
-            <div className="flex gap-2 mb-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Cari produk..."
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
-              </div>
-              <select 
-                value={selectedUnit} 
-                onChange={e => setSelectedUnit(e.target.value)}
-                className="px-3 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Semua Unit</option>
-                {units.filter(u => u.id === currentUser?.unitId).map(unit => (
-                  <option key={unit.id} value={unit.id}>{unit.name}</option>
-                ))}
-              </select>
+              <button onClick={handleBackupAll} disabled={isBackupLoading} className="px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/10 text-blue-700 hover:bg-blue-500/20 disabled:opacity-50 transition-all">
+                <Cloud className="w-3.5 h-3.5 inline mr-1.5" />{isBackupLoading ? 'BACKUP...' : 'BACKUP'}
+              </button>
             </div>
-            <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
-              {filteredProducts.map(p => {
-                const stock = getProductStock(p);
-                const inCart = cart.find(c => c.productId === p.id);
-                const productUnit = units.find(u => u.id === p.unitId);
-                return (
-                  <button key={p.id} onClick={() => stock > 0 && addToCart(p.id, 1)} disabled={stock <= 0}
-                    className={`bg-card rounded-xl p-4 text-left shadow-card hover:shadow-elevated transition-all relative ${stock <= 0 ? 'opacity-50' : 'hover:scale-[1.02]'}`}>
-                    {stock <= 5 && stock > 0 && (
-                      <div className="absolute top-2 right-2">
-                        <AlertTriangle className="w-4 h-4 text-accent" />
-                      </div>
-                    )}
-                    {inCart && (
-                      <div className="absolute top-2 left-2 w-6 h-6 rounded-full primary-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
-                        {inCart.qty}
-                      </div>
-                    )}
-                    <Package className="w-8 h-8 text-primary/30 mb-2" />
-                    <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{p.supplier}</p>
-                    <div className="mt-2 space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Satuan:</span>
-                        <span className="text-xs font-medium text-foreground">{p.satuan || 'pcs'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Unit:</span>
-                        <span className="text-xs font-medium text-foreground">{productUnit?.name || '-'}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Harga:</span>
-                        <span className="text-sm font-bold text-primary">{formatRupiah(p.price)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-muted-foreground">Stok:</span>
-                        <span className={`text-xs font-medium ${stock <= 5 ? 'text-accent' : 'text-foreground'}`}>
-                          {stock} {p.satuan || 'pcs'}
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+
+            <button 
+              onClick={() => setShowAddProduct(true)}
+              className="px-4 py-2 primary-gradient text-primary-foreground rounded-xl text-sm font-bold shadow-md shadow-primary/20 hover:opacity-90 transition-all flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              STOK PRODUK
+            </button>
           </div>
+        </header>
 
-          {/* Cart */}
-          <div className="w-96 bg-card border-l border-border flex flex-col">
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-primary" />
-                <h3 className="font-bold text-foreground">Keranjang</h3>
-                <span className="text-xs text-muted-foreground">({cartItems.length})</span>
-              </div>
-              {cartItems.length > 0 && (
-                <button onClick={clearCart} className="text-xs text-destructive hover:underline">Hapus Semua</button>
-              )}
+        {/* Content Body */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {activePage === 'dashboard' && (
+            <div className="flex-1 overflow-y-auto">
+              <CashierDashboard />
             </div>
+          )}
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {cartItems.length === 0 ? (
-                <div className="text-center py-8">
-                  <ShoppingCart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">Keranjang kosong</p>
+          {activePage === 'cashin' && (
+            <div className="flex-1 p-6 overflow-y-auto">
+              <CashIn />
+            </div>
+          )}
+
+          {activePage === 'pos' && (
+            <div className="flex-1 flex overflow-hidden">
+              {/* Products */}
+              <div className="flex-1 flex flex-col overflow-hidden p-4">
+                <div className="flex gap-2 mb-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Cari produk..."
+                      className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
+                  </div>
+                  <select 
+                    value={selectedUnit} 
+                    onChange={e => setSelectedUnit(e.target.value)}
+                    className="px-3 py-2.5 rounded-lg border border-input bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  >
+                    <option value="">Semua Unit</option>
+                    {(units || []).filter(u => u.id === currentUser?.unitId).map(unit => (
+                      <option key={unit.id} value={unit.id}>{unit.name}</option>
+                    ))}
+                  </select>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {cartItems.map((c, index) => {
-                    const product = products.find(p => p.id === c.productId);
-                    const productUnit = units.find(u => u.id === product?.unitId);
-                    if (!product) return null;
-                    
+                <div className="flex-1 overflow-y-auto grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 content-start">
+                  {filteredProducts.map(p => {
+                    const stock = getProductStock(p);
+                    const inCart = cart.find(c => c.productId === p.id);
+                    const productUnit = units.find(u => u.id === p.unitId);
                     return (
-                      <div key={c.productId} className="bg-background rounded-lg p-3">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-medium text-foreground text-sm">{product.name}</h4>
-                            <p className="text-xs text-muted-foreground">{product.supplier}</p>
-                            <div className="mt-1 flex gap-2">
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded">{product.satuan || 'pcs'}</span>
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded">{productUnit?.name || '-'}</span>
-                            </div>
+                      <button key={p.id} onClick={() => stock > 0 && addToCart(p.id, 1)} disabled={stock <= 0}
+                        className={`bg-card rounded-xl p-4 text-left shadow-card hover:shadow-elevated transition-all relative ${stock <= 0 ? 'opacity-50' : 'hover:scale-[1.02]'}`}>
+                        {stock <= 5 && stock > 0 && (
+                          <div className="absolute top-2 right-2">
+                            <AlertTriangle className="w-4 h-4 text-accent" />
                           </div>
-                          <button 
-                            onClick={() => removeFromCart(c.productId)}
-                            className="text-destructive hover:bg-destructive/10 p-1 rounded"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            <div>
-                              <label className="text-xs text-muted-foreground">Jumlah</label>
-                              <input
-                                type="number"
-                                value={c.qty}
-                                onChange={e => {
-                                  const newQty = parseFloat(e.target.value) || 0;
-                                  updateCartQty(c.productId, newQty);
-                                }}
-                                className="w-full px-2 py-1.5 rounded border border-input bg-background text-foreground text-sm"
-                                step="0.1"
-                                min="0.1"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-muted-foreground">Harga/Unit</label>
-                              <p className="text-sm font-medium text-foreground">{formatRupiah(product.price)}</p>
-                            </div>
+                        )}
+                        {inCart && (
+                          <div className="absolute top-2 left-2 w-6 h-6 rounded-full primary-gradient flex items-center justify-center text-xs font-bold text-primary-foreground">
+                            {inCart.qty}
                           </div>
-                          <div className="flex justify-between items-center pt-2 border-t border-border">
-                            <span className="text-xs text-muted-foreground">Subtotal:</span>
-                            <span className="text-sm font-bold text-primary">{formatRupiah(product.price * c.qty)}</span>
+                        )}
+                        <Package className="w-8 h-8 text-primary/30 mb-2" />
+                        <p className="text-sm font-semibold text-foreground truncate">{p.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{p.supplier}</p>
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">Satuan:</span>
+                            <span className="text-xs font-medium text-foreground">{p.satuan || 'pcs'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">Unit:</span>
+                            <span className="text-xs font-medium text-foreground">{productUnit?.name || '-'}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">Harga:</span>
+                            <span className="text-sm font-bold text-primary">{formatRupiah(p.price)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted-foreground">Stok:</span>
+                            <span className={`text-xs font-bold ${stock <= 5 ? 'text-accent' : 'text-success'}`}>{stock}</span>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-border bg-muted/30">
-              <div className="flex justify-between mb-3">
-                <span className="text-sm text-muted-foreground">Subtotal</span>
-                <span className="text-lg font-bold text-foreground">{formatRupiah(subtotal)}</span>
               </div>
-              <button onClick={() => cartItems.length > 0 && setShowPayment(true)} disabled={cartItems.length === 0}
-                className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
-                <DollarSign className="w-5 h-5" /> Bayar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {activePage === 'expense' && (
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-lg mx-auto space-y-6">
-            <CashIn />
-            <div className="bg-card rounded-xl p-6 shadow-card">
-              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                <TrendingDown className="w-5 h-5 text-primary" /> Tambah Pengeluaran
-              </h3>
-              <div className="space-y-3">
-                <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Deskripsi pengeluaran"
-                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
-                <input type="number" value={expAmount || ''} onChange={e => setExpAmount(Number(e.target.value))} placeholder="Jumlah (Rp)"
-                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
-                <button onClick={handleAddExpense} className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold">Simpan Pengeluaran</button>
-              </div>
-            </div>
-            <div className="bg-card rounded-xl shadow-card overflow-hidden">
-              <h3 className="font-bold text-foreground p-4 border-b border-border">Pengeluaran Hari Ini</h3>
-              <div className="divide-y divide-border">
-                {sessionExp.map(e => (
-                  <div key={e.id} className="p-4 flex justify-between">
-                    <span className="text-sm text-foreground">{e.description}</span>
-                    <span className="text-sm font-bold text-destructive">{formatRupiah(e.amount)}</span>
+              {/* Cart */}
+              <div className="w-80 border-l border-border bg-card flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-border flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="w-5 h-5 text-primary" />
+                    <h3 className="font-bold text-foreground">Keranjang</h3>
                   </div>
-                ))}
-                {sessionExp.length === 0 && <p className="p-6 text-center text-muted-foreground text-sm">Belum ada pengeluaran</p>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+                  <button onClick={clearCart} className="text-xs font-medium text-destructive hover:underline">Hapus Semua</button>
+                </div>
 
-      {activePage === 'debt' && (
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-2xl mx-auto space-y-6">
-            {/* Add Manual Debt */}
-            <div className="bg-card rounded-xl p-6 shadow-card">
-              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" /> Tambah Piutang Manual
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Nama Pelanggan *</label>
-                  <input
-                    value={manualDebt.customerName}
-                    onChange={e => setManualDebt(prev => ({ ...prev, customerName: e.target.value }))}
-                    placeholder="Masukkan nama pelanggan"
-                    className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">No. Telepon</label>
-                  <input
-                    value={manualDebt.customerPhone}
-                    onChange={e => setManualDebt(prev => ({ ...prev, customerPhone: e.target.value }))}
-                    placeholder="Masukkan nomor telepon"
-                    className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Jumlah Piutang *</label>
-                  <input
-                    type="number"
-                    value={manualDebt.amount}
-                    onChange={e => setManualDebt(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                    placeholder="0"
-                    min="0"
-                    className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">Tanggal</label>
-                  <input
-                    type="date"
-                    value={manualDebt.date.split('T')[0]}
-                    onChange={e => setManualDebt(prev => ({ ...prev, date: new Date(e.target.value).toISOString() }))}
-                    className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="text-sm font-medium text-foreground mb-2 block">Deskripsi</label>
-                <textarea
-                  value={manualDebt.description}
-                  onChange={e => setManualDebt(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Deskripsi piutang (opsional)"
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                />
-              </div>
-              <button onClick={handleAddManualDebt} className="w-full mt-4 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">
-                Tambah Piutang Manual
-              </button>
-            </div>
-
-            {/* Debt List */}
-            <div className="bg-card rounded-xl shadow-card overflow-hidden">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <h3 className="font-bold text-foreground flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-primary" /> Daftar Piutang
-                </h3>
-                <button
-                  onClick={() => setShowDebtExportModal(true)}
-                  className="px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-              </div>
-              <div className="divide-y divide-border">
-                {debts.filter(d => d.unitId === currentUser?.unitId && d.status !== 'paid').map(d => (
-                  <div key={d.id} className="p-4">
-                    <div className="flex justify-between mb-2">
-                      <div>
-                        <p className="font-semibold text-foreground">{d.customerName}</p>
-                        <p className="text-xs text-muted-foreground">{d.customerPhone}</p>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                  {cartItems.map(item => (
+                    <div key={item.product.id} className="space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{item.product.name}</p>
+                          <p className="text-xs text-muted-foreground">{formatRupiah(item.product.price)} x {item.qty}</p>
+                        </div>
+                        <p className="text-sm font-bold text-foreground ml-2">{formatRupiah(item.product.price * item.qty)}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Total: {formatRupiah(d.totalAmount)}</p>
-                        <p className="font-bold text-accent">Sisa: {formatRupiah(d.remainingAmount)}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                          <button onClick={() => updateCartQty(item.product.id, Math.max(1, item.qty - 1))}
+                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-background text-foreground transition-colors">
+                            <Minus className="w-3 h-3" />
+                          </button>
+                          <span className="w-8 text-center text-xs font-bold text-foreground">{item.qty}</span>
+                          <button onClick={() => updateCartQty(item.product.id, item.qty + 1)}
+                            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-background text-foreground transition-colors">
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <button onClick={() => removeFromCart(item.product.id)}
+                          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
-                    <button onClick={() => handlePayDebt(d)} className="mt-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium">
-                      Bayar Piutang
-                    </button>
+                  ))}
+                  {cartItems.length === 0 && (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40 py-10">
+                      <ShoppingCart className="w-12 h-12 mb-3" />
+                      <p className="text-sm font-medium">Keranjang kosong</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-4 border-t border-border bg-muted/30">
+                  <div className="flex justify-between mb-3">
+                    <span className="text-sm text-muted-foreground">Subtotal</span>
+                    <span className="text-lg font-bold text-foreground">{formatRupiah(subtotal)}</span>
                   </div>
-                ))}
-                {debts.filter(d => d.unitId === currentUser?.unitId && d.status !== 'paid').length === 0 && (
-                  <p className="p-6 text-center text-muted-foreground text-sm">Tidak ada piutang</p>
-                )}
+                  <button onClick={() => cartItems.length > 0 && setShowPayment(true)} disabled={cartItems.length === 0}
+                    className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                    <DollarSign className="w-5 h-5" /> Bayar
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Payment Modal */}
+          {activePage === 'expense' && (
+            <div className="flex-1 p-6 overflow-y-auto">
+              <div className="max-w-lg mx-auto space-y-6">
+                <div className="bg-card rounded-xl p-6 shadow-card">
+                  <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                    <TrendingDown className="w-5 h-5 text-primary" /> Tambah Pengeluaran
+                  </h3>
+                  <div className="space-y-3">
+                    <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Deskripsi pengeluaran"
+                      className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <input type="number" value={expAmount || ''} onChange={e => setExpAmount(Number(e.target.value))} placeholder="Jumlah (Rp)"
+                      className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
+                    <button onClick={handleAddExpense} className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold">Simpan Pengeluaran</button>
+                  </div>
+                </div>
+                <div className="bg-card rounded-xl shadow-card overflow-hidden">
+                  <h3 className="font-bold text-foreground p-4 border-b border-border">Pengeluaran Hari Ini</h3>
+                  <div className="divide-y divide-border">
+                    {sessionExp.map(e => (
+                      <div key={e.id} className="p-4 flex justify-between">
+                        <span className="text-sm text-foreground">{e.description}</span>
+                        <span className="text-sm font-bold text-destructive">{formatRupiah(e.amount)}</span>
+                      </div>
+                    ))}
+                    {sessionExp.length === 0 && <p className="p-6 text-center text-muted-foreground text-sm">Belum ada pengeluaran</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activePage === 'debt' && (
+            <div className="flex-1 p-6 overflow-y-auto">
+              <div className="max-w-2xl mx-auto space-y-6">
+                {/* Add Manual Debt */}
+                <div className="bg-card rounded-xl p-6 shadow-card">
+                  <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                    <CreditCard className="w-5 h-5 text-primary" /> Tambah Piutang Manual
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">Nama Pelanggan *</label>
+                      <input
+                        value={manualDebt.customerName}
+                        onChange={e => setManualDebt(prev => ({ ...prev, customerName: e.target.value }))}
+                        placeholder="Masukkan nama pelanggan"
+                        className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">No. Telepon</label>
+                      <input
+                        value={manualDebt.customerPhone}
+                        onChange={e => setManualDebt(prev => ({ ...prev, customerPhone: e.target.value }))}
+                        placeholder="Masukkan nomor telepon"
+                        className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">Jumlah Piutang *</label>
+                      <input
+                        type="number"
+                        value={manualDebt.amount}
+                        onChange={e => setManualDebt(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                        placeholder="0"
+                        min="0"
+                        className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium text-foreground mb-2 block">Tanggal</label>
+                      <input
+                        type="date"
+                        value={manualDebt.date.split('T')[0]}
+                        onChange={e => setManualDebt(prev => ({ ...prev, date: new Date(e.target.value).toISOString() }))}
+                        className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <label className="text-sm font-medium text-foreground mb-2 block">Deskripsi</label>
+                    <textarea
+                      value={manualDebt.description}
+                      onChange={e => setManualDebt(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Deskripsi piutang (opsional)"
+                      rows={3}
+                      className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    />
+                  </div>
+                  <button onClick={handleAddManualDebt} className="w-full mt-4 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90">
+                    Tambah Piutang Manual
+                  </button>
+                </div>
+
+                {/* Debt List */}
+                <div className="bg-card rounded-xl shadow-card overflow-hidden">
+                  <div className="p-4 border-b border-border flex items-center justify-between">
+                    <h3 className="font-bold text-foreground flex items-center gap-2">
+                      <CreditCard className="w-5 h-5 text-primary" /> Daftar Piutang
+                    </h3>
+                    <button
+                      onClick={() => setShowDebtExportModal(true)}
+                      className="px-3 py-1.5 bg-muted hover:bg-muted/80 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      Export
+                    </button>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {debts.filter(d => d.unitId === currentUser?.unitId && d.status !== 'paid').map(d => (
+                      <div key={d.id} className="p-4">
+                        <div className="flex justify-between mb-2">
+                          <div>
+                            <p className="font-semibold text-foreground">{d.customerName}</p>
+                            <p className="text-xs text-muted-foreground">{d.customerPhone}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">Total: {formatRupiah(d.totalAmount)}</p>
+                            <p className="font-bold text-accent">Sisa: {formatRupiah(d.remainingAmount)}</p>
+                          </div>
+                        </div>
+                        <button onClick={() => handlePayDebt(d)} className="mt-2 px-4 py-2 primary-gradient text-primary-foreground rounded-lg text-sm font-medium">
+                          Bayar Piutang
+                        </button>
+                      </div>
+                    ))}
+                    {debts.filter(d => d.unitId === currentUser?.unitId && d.status !== 'paid').length === 0 && (
+                      <p className="p-6 text-center text-muted-foreground text-sm">Tidak ada piutang</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modals */}
       {showPayment && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowPayment(false)}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
@@ -1447,7 +1377,6 @@ Simpan bukti ini sebagai referensi Anda.`;
         </div>
       )}
 
-      {/* Invoice Modal */}
       {showInvoice && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => { setShowInvoice(null); }}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
@@ -1550,7 +1479,6 @@ Simpan bukti ini sebagai referensi Anda.`;
         </div>
       )}
 
-      {/* Close Cashier Modal */}
       {showCashierClose && activeSession && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowCashierClose(false)}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-md animate-scale-in" onClick={e => e.stopPropagation()}>
@@ -1570,138 +1498,6 @@ Simpan bukti ini sebagai referensi Anda.`;
                 <div className="flex justify-between"><span className="text-muted-foreground">Jumlah Transaksi</span><span className="text-foreground">{sessionTx.length}</span></div>
               </div>
               
-              {/* Detailed Payment Report */}
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Laporan Pembayaran Terperinci</p>
-                <div className="space-y-3 max-h-60 overflow-y-auto">
-                  {/* Sales Transactions */}
-                  {sessionTx.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">💰 Penjualan ({sessionTx.length})</p>
-                      <div className="space-y-1">
-                        {sessionTx.map(tx => (
-                          <div key={tx.id} className="bg-background rounded p-2 text-xs">
-                            <div className="flex justify-between items-start">
-                              <div className="flex-1">
-                                <p className="font-medium text-foreground">{tx.customerName || 'Umum'}</p>
-                                <p className="text-muted-foreground">
-                                  {tx.items.slice(0, 2).map(item => `${item.productName} x${item.qty}`).join(', ')}
-                                  {tx.items.length > 2 && ` +${tx.items.length - 2} lainnya`}
-                                </p>
-                              </div>
-                              <div className="text-right ml-2">
-                                <p className="font-bold text-foreground">{formatRupiah(tx.grandTotal)}</p>
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                  tx.paymentType === 'cash' ? 'bg-green-100 text-green-700' :
-                                  tx.paymentType === 'transfer' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-purple-100 text-purple-700'
-                                }`}>
-                                  {tx.paymentType === 'cash' ? 'Tunai' : tx.paymentType === 'transfer' ? 'Transfer' : 'Kredit'}
-                                </span>
-                              </div>
-                            </div>
-                            {tx.paymentType === 'credit' && (
-                              <div className="mt-1 pt-1 border-t border-border/50">
-                                <p className="text-muted-foreground">
-                                  DP: {formatRupiah(tx.dp || 0)} | Sisa: {formatRupiah(tx.grandTotal - (tx.dp || 0))}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Cash In Transactions */}
-                  {sessionCashIn.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">💵 Kas Masuk ({sessionCashIn.length})</p>
-                      <div className="space-y-1">
-                        {sessionCashIn.map(ci => (
-                          <div key={ci.id} className="bg-background rounded p-2 text-xs">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="font-medium text-foreground">{ci.depositorName}</p>
-                                <p className="text-muted-foreground">{ci.description}</p>
-                              </div>
-                              <p className="font-bold text-green-600">{formatRupiah(ci.amount)}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Expense Transactions */}
-                  {sessionExp.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground mb-2">💸 Pengeluaran ({sessionExp.length})</p>
-                      <div className="space-y-1">
-                        {sessionExp.map(exp => (
-                          <div key={exp.id} className="bg-background rounded p-2 text-xs">
-                            <div className="flex justify-between items-center">
-                              <p className="text-muted-foreground">{exp.description}</p>
-                              <p className="font-bold text-red-600">{formatRupiah(exp.amount)}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Debt Payments */}
-                  {(() => {
-                    const debtPayments = debts
-                      .filter(d => d.unitId === activeSession.unitId)
-                      .flatMap(d => 
-                        (d.payments || [])
-                          .filter(p => new Date(p.date) >= new Date(activeSession.startTime) && 
-                                       (!activeSession.endTime || new Date(p.date) <= new Date(activeSession.endTime)))
-                          .map(p => ({
-                            ...p,
-                            customerName: d.customerName,
-                            debtId: d.id
-                          }))
-                      );
-                    
-                    return debtPayments.length > 0 && (
-                      <div>
-                        <p className="text-xs font-semibold text-muted-foreground mb-2">📋 Pelunasan Piutang ({debtPayments.length})</p>
-                        <div className="space-y-1">
-                          {debtPayments.map((payment, idx) => (
-                            <div key={`${payment.debtId}-${idx}`} className="bg-background rounded p-2 text-xs">
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <p className="font-medium text-foreground">{payment.customerName}</p>
-                                  <p className="text-muted-foreground">{formatDateTime(payment.date)}</p>
-                                </div>
-                                <p className="font-bold text-indigo-600">{formatRupiah(payment.amount)}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                  
-                  {/* Empty State */}
-                  {sessionTx.length === 0 && sessionCashIn.length === 0 && sessionExp.length === 0 && (() => {
-                    const debtPayments = debts
-                      .filter(d => d.unitId === activeSession.unitId)
-                      .flatMap(d => (d.payments || [])
-                        .filter(p => new Date(p.date) >= new Date(activeSession.startTime) && 
-                                       (!activeSession.endTime || new Date(p.date) <= new Date(activeSession.endTime))));
-                    return debtPayments.length === 0;
-                  })() && (
-                    <div className="text-center text-muted-foreground py-4">
-                      <p className="text-sm">Belum ada transaksi dalam sesi ini</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Export Buttons */}
               <div className="bg-muted/30 rounded-lg p-4">
                 <p className="text-sm font-medium text-foreground mb-3">Export Laporan Sesi</p>
                 <ExportButtons 
@@ -1710,37 +1506,7 @@ Simpan bukti ini sebagai referensi Anda.`;
                   title={`Laporan Kasir ${currentUser?.name} - ${formatDateTime(new Date().toISOString())}`}
                 />
               </div>
-              
-              {/* Print Session Report */}
-              <div className="bg-muted/30 rounded-lg p-4">
-                <p className="text-sm font-medium text-foreground mb-3">Cetak Laporan Sesi</p>
-                <PrintButtons 
-                  sessionData={{
-                    cashierName: currentUser?.name,
-                    unitName: units.find(u => u.id === activeSession.unitId)?.name,
-                    sessionId: activeSession.id.slice(-6).toUpperCase(),
-                    openTime: formatDateTime(activeSession.startTime),
-                    openingCash: activeSession.openingCash,
-                    totalSales: sessionSales,
-                    totalCashIn: sessionCashInTotal,
-                    totalExpenses: sessionExpTotal,
-                    totalPaidToday: sessionReportData
-                      .filter(row => row['Tipe'] === 'Pelunasan Piutang')
-                      .reduce((sum, row) => sum + (row['Jumlah'] || 0), 0),
-                    finalBalance: activeSession.openingCash + sessionSales + sessionCashInTotal - sessionExpTotal,
-                    transactionCount: sessionTx.length,
-                    // Add sales breakdown
-                    cashSales: sessionTx.filter(t => t.paymentType === 'cash').reduce((sum, t) => sum + t.grandTotal, 0),
-                    transferSales: sessionTx.filter(t => t.paymentType === 'transfer').reduce((sum, t) => sum + t.grandTotal, 0),
-                    creditSales: sessionTx.filter(t => t.paymentType === 'credit').reduce((sum, t) => sum + t.grandTotal, 0),
-                    dpPayments: sessionTx.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.dp || 0), 0),
-                    remainingCredit: sessionTx.filter(t => t.dp && t.dp < t.grandTotal).reduce((sum, t) => sum + (t.grandTotal - (t.dp || 0)), 0)
-                  }}
-                  sessionTransactions={sessionReportData}
-                  type="session"
-                />
-              </div>
-              
+
               <div className="flex gap-2">
                 <button onClick={() => setShowCashierClose(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium">Batal</button>
                 <button onClick={handleCloseSession} className="flex-1 py-3 bg-destructive text-destructive-foreground rounded-lg font-medium">Tutup Kasir</button>
@@ -1750,7 +1516,6 @@ Simpan bukti ini sebagai referensi Anda.`;
         </div>
       )}
 
-      {/* Add Product Modal */}
       {showAddProduct && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowAddProduct(false)}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
@@ -1776,7 +1541,7 @@ Simpan bukti ini sebagai referensi Anda.`;
                 >
                   <option value="">-- Pilih Produk --</option>
                   {unitProducts.map(product => {
-                    const currentStock = realTimeStock[product.id] || getProductStock(product);
+                    const currentStock = getProductStock(product);
                     return (
                       <option key={product.id} value={product.id}>
                         {product.name} - Stok: {currentStock} {product.satuan || 'pcs'}
@@ -1809,44 +1574,6 @@ Simpan bukti ini sebagai referensi Anda.`;
                 />
               </div>
 
-              {addStockProduct.productId && (
-                <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-foreground mb-2">Informasi Produk:</p>
-                  {(() => {
-                    const selectedProduct = products.find(p => p.id === addStockProduct.productId);
-                    const currentStock = selectedProduct ? (realTimeStock[addStockProduct.productId] || getProductStock(selectedProduct)) : 0;
-                    return selectedProduct ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                          <p className="text-muted-foreground">Nama:</p>
-                          <p className="text-foreground font-medium">{selectedProduct.name}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                          <p className="text-muted-foreground">Satuan:</p>
-                          <p className="text-foreground font-medium">{selectedProduct.satuan || 'pcs'}</p>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                          <p className="text-muted-foreground">Stok Saat Ini:</p>
-                          <p className="text-foreground font-medium">{currentStock} {selectedProduct.satuan || 'pcs'}</p>
-                        </div>
-                        {addStockProduct.additionalStock > 0 && (
-                          <>
-                            <div className="grid grid-cols-2 gap-2 mb-2">
-                              <p className="text-muted-foreground">Ditambahkan:</p>
-                              <p className="text-success font-medium">+{addStockProduct.additionalStock} {selectedProduct.satuan || 'pcs'}</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <p className="text-muted-foreground">Stok Setelah:</p>
-                              <p className="text-primary font-bold">{currentStock + addStockProduct.additionalStock} {selectedProduct.satuan || 'pcs'}</p>
-                            </div>
-                          </>
-                        )}
-                      </>
-                    ) : null;
-                  })()}
-                </div>
-              )}
-
               <div className="flex gap-2">
                 <button onClick={handleAddProduct} className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
                   Tambah Stok
@@ -1860,381 +1587,109 @@ Simpan bukti ini sebagai referensi Anda.`;
         </div>
       )}
 
-      {/* Stock History Modal */}
       {showStockHistory && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowStockHistory(false)}>
           <div className="bg-card rounded-2xl shadow-float w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">📊 Riwayat Penambahan Stok</h3>
               <div className="flex items-center gap-2">
-                {stockHistory.length > 0 && (
-                  <>
-                    <button 
-                      onClick={handleExportStockHistoryToGoogleSheets}
-                      className="px-3 py-1.5 bg-success/10 hover:bg-success/20 text-success rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                    >
-                      <Cloud className="w-4 h-4" />
-                      Google Sheets
-                    </button>
-                    <button 
-                      onClick={handleExportStockHistoryToPDF}
-                      className="px-3 py-1.5 bg-info/10 hover:bg-info/20 text-info rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
-                    >
-                      <Download className="w-4 h-4" />
-                      PDF
-                    </button>
-                  </>
-                )}
                 <button onClick={() => setShowStockHistory(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
               </div>
             </div>
-            <div className="p-6">
+            <div className="p-6 overflow-y-auto">
               {stockHistory.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
-                    <Package className="w-8 h-8 text-muted-foreground" />
-                  </div>
                   <p className="text-muted-foreground">Belum ada riwayat penambahan stok</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {stockHistory.map((entry) => {
-                    const currentStock = realTimeStock[entry.productId] || getProductStock(products.find(p => p.id === entry.productId));
+                    const product = products.find(p => p.id === entry.productId);
+                    const currentStock = product ? getProductStock(product) : 0;
                     return (
                       <div key={entry.id} className="bg-background rounded-lg p-4 border border-border">
                         <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1">
+                          <div>
                             <h4 className="font-semibold text-foreground">{entry.productName}</h4>
-                            <p className="text-xs text-muted-foreground">Kasir: {entry.cashierName}</p>
                             <p className="text-xs text-muted-foreground">{formatDateTime(entry.date)}</p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleEditStock(entry)}
-                              className="p-1.5 rounded-lg bg-info/10 hover:bg-info/20 text-info transition-colors"
-                              title="Edit Stok"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">
-                              {entry.addedStock > 0 ? '+' : ''}{entry.addedStock}
-                            </span>
+                            <button onClick={() => handleEditStock(entry)} className="p-1.5 rounded bg-info/10 text-info"><FileText className="w-4 h-4" /></button>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-success/10 text-success">+{entry.addedStock}</span>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Stok Sebelumnya: </span>
-                            <span className="font-medium">{entry.oldStock || 0}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Stok Setelah: </span>
-                            <span className="font-bold text-success">{entry.newStock || 0}</span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm mt-2">
-                          <div>
-                            <span className="text-muted-foreground">Stok Saat Ini: </span>
-                            <span className="font-medium text-info">{currentStock}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Satuan: </span>
-                            <span className="font-medium">{products.find(p => p.id === entry.productId)?.satuan || 'pcs'}</span>
-                          </div>
-                        </div>
-                        {entry.notes && (
-                          <div className="mt-2 pt-2 border-t border-border">
-                            <p className="text-xs text-muted-foreground">Catatan: {entry.notes}</p>
-                          </div>
-                        )}
+                        <p className="text-xs text-muted-foreground">Stok Sebelumnya: {entry.oldStock} | Stok Setelah: {entry.newStock}</p>
+                        {entry.notes && <p className="text-xs text-muted-foreground mt-1 italic">Catatan: {entry.notes}</p>}
                       </div>
                     );
                   })}
                 </div>
               )}
             </div>
-            <div className="p-6 border-t border-border">
-              <button 
-                onClick={() => setShowStockHistory(false)}
-                className="w-full py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
-              >
-                Tutup
-              </button>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Edit Stock Modal */}
       {showEditStock && editingStock && (
         <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowEditStock(false)}>
-          <div className="bg-card rounded-2xl shadow-float w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
+          <div className="bg-card rounded-2xl shadow-float w-full max-w-md animate-scale-in" onClick={e => e.stopPropagation()}>
             <div className="p-6 border-b border-border flex items-center justify-between">
               <h3 className="text-lg font-bold text-foreground">Edit Stok Produk</h3>
               <button onClick={() => setShowEditStock(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="text-sm font-medium text-foreground mb-2 block">Nama Produk</label>
-                <input
-                  type="text"
-                  value={editingStock.productName}
-                  disabled
-                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-muted text-foreground text-sm"
-                />
-              </div>
-              
-              <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Stok Saat Ini *</label>
-                <input
-                  type="number"
-                  value={editingStock.currentStock}
-                  onChange={e => setEditingStock(prev => prev ? { ...prev, currentStock: Number(e.target.value) } : null)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="0"
-                  min="0"
-                  step="0.1"
-                />
+                <input type="number" value={editingStock.currentStock} onChange={e => setEditingStock(prev => prev ? { ...prev, currentStock: Number(e.target.value) } : null)}
+                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-
-              <div>
-                <label className="text-sm font-medium text-foreground mb-2 block">Catatan</label>
-                <textarea
-                  value={editingStock.notes}
-                  onChange={e => setEditingStock(prev => prev ? { ...prev, notes: e.target.value } : null)}
-                  className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                  placeholder="Catatan perubahan stok (opsional)"
-                  rows={3}
-                />
-              </div>
-
-              {editingStock && (
-                <div className="bg-muted/50 rounded-lg p-3 text-sm">
-                  <p className="font-medium text-foreground mb-2">Informasi Perubahan:</p>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <p className="text-muted-foreground">Produk:</p>
-                    <p className="text-foreground font-medium">{editingStock.productName}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <p className="text-muted-foreground">Stok Baru:</p>
-                    <p className="text-primary font-bold">{editingStock.currentStock} {products.find(p => p.id === editingStock.productId)?.satuan || 'pcs'}</p>
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-2">
-                <button onClick={handleUpdateStock} className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">
-                  Update Stok
-                </button>
-                <button onClick={() => setShowEditStock(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors">
-                  Batal
-                </button>
+                <button onClick={handleUpdateStock} className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity">Update Stok</button>
+                <button onClick={() => setShowEditStock(false)} className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors">Batal</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Debt Payment Modal */}
+      {showDebtExportModal && (
+        <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowDebtExportModal(false)}>
+          <div className="bg-card rounded-2xl shadow-float w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">Export Data Piutang</h3>
+              <button onClick={() => setShowDebtExportModal(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-3">
+              <button onClick={handleDebtExportToGoogleSheets} className="w-full py-3 bg-success/10 text-success rounded-lg font-medium flex items-center justify-center gap-2"><Cloud className="w-5 h-5" /> Export ke Google Sheets</button>
+              <button onClick={() => setShowDebtExportModal(false)} className="w-full py-3 bg-secondary text-secondary-foreground rounded-lg font-medium">Batal</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDebtPayment && selectedDebt && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-elevated w-full max-w-md animate-scale-in">
-            <div className="p-6 border-b border-border">
-              <h3 className="text-lg font-bold text-foreground">Pembayaran Piutang</h3>
+        <div className="fixed inset-0 bg-foreground/40 flex items-center justify-center z-50 p-4" onClick={() => setShowDebtPayment(false)}>
+          <div className="bg-card rounded-2xl shadow-float w-full max-w-md animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-border flex items-center justify-between">
+              <h3 className="text-lg font-bold text-foreground">Bayar Piutang</h3>
+              <button onClick={() => setShowDebtPayment(false)} className="p-2 rounded-lg hover:bg-muted"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-muted/50 rounded-lg p-3">
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <p className="text-sm text-muted-foreground">Pelanggan:</p>
-                  <p className="text-sm font-medium text-foreground">{selectedDebt.customerName}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <p className="text-sm text-muted-foreground">Total Piutang:</p>
-                  <p className="text-sm font-medium text-foreground">{formatRupiah(selectedDebt.totalAmount)}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <p className="text-sm text-muted-foreground">Sisa Piutang:</p>
-                  <p className="text-sm font-bold text-accent">{formatRupiah(selectedDebt.remainingAmount)}</p>
-                </div>
+              <div className="bg-muted/50 rounded-lg p-4 space-y-1 text-sm">
+                <p className="text-muted-foreground">Pelanggan: <span className="text-foreground font-semibold">{selectedDebt.customerName}</span></p>
+                <p className="text-muted-foreground">Sisa Piutang: <span className="text-accent font-bold">{formatRupiah(selectedDebt.remainingAmount)}</span></p>
               </div>
-              
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Jumlah Pembayaran *</label>
-                <input
-                  type="number"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                  placeholder="0"
-                  min={0}
-                  max={selectedDebt.remainingAmount}
-                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                />
+                <input type="number" value={paymentAmount} onChange={e => setPaymentAmount(Number(e.target.value))}
+                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary" />
               </div>
-              
               <div>
                 <label className="text-sm font-medium text-foreground mb-2 block">Catatan</label>
-                <textarea
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                  placeholder="Catatan pembayaran (opsional)"
-                  rows={3}
-                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                />
+                <textarea value={paymentNotes} onChange={e => setPaymentNotes(e.target.value)} rows={3}
+                  className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none" />
               </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowDebtPayment(false)}
-                  className="flex-1 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleProcessDebtPayment}
-                  className="flex-1 py-3 primary-gradient text-primary-foreground rounded-lg font-semibold hover:opacity-90 transition-opacity"
-                >
-                  Proses Pembayaran
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Debt Invoice Modal */}
-      {showDebtInvoice && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-elevated w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-scale-in">
-            <div className="p-6 border-b border-border">
-              <h3 className="text-lg font-bold text-foreground">Invoice Pembayaran Piutang</h3>
-            </div>
-            <div className="p-6">
-              {/* Invoice content will be handled by PrintButtons */}
-              <div className="bg-muted/50 rounded-lg p-4 mb-4">
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">No. Invoice:</p>
-                    <p className="font-bold text-foreground">DEBT-{Date.now().toString().slice(-6).toUpperCase()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm text-muted-foreground">Tanggal:</p>
-                    <p className="font-bold text-foreground">{formatDateTime(new Date().toISOString())}</p>
-                  </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <p className="text-sm text-muted-foreground">Pelanggan:</p>
-                    <p className="text-sm font-medium text-foreground">{selectedDebt?.customerName}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <p className="text-sm text-muted-foreground">Jumlah Bayar:</p>
-                    <p className="text-sm font-bold text-success">{formatRupiah(paymentAmount)}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <p className="text-sm text-muted-foreground">Sisa Piutang:</p>
-                    <p className="text-sm font-bold text-accent">{formatRupiah((selectedDebt?.remainingAmount || 0) - paymentAmount)}</p>
-                  </div>
-                  {paymentNotes && (
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-1">Catatan:</p>
-                      <p className="text-sm text-foreground">{paymentNotes}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mb-4">
-                <PrintButtons 
-                  transaction={{
-                    id: 'DEBT_' + Date.now(),
-                    date: new Date().toISOString(),
-                    customerName: selectedDebt?.customerName,
-                    customerPhone: selectedDebt?.customerPhone,
-                    grandTotal: paymentAmount,
-                    total: paymentAmount,
-                    subtotal: paymentAmount, // For debt payment, use payment amount as subtotal
-                    paymentType: 'cash',
-                    items: [],
-                    cashierName: currentUser?.name,
-                    type: 'debt_payment'
-                  }}
-                  type="invoice"
-                />
-                <PrintButtons 
-                  transaction={{
-                    id: 'DEBT_' + Date.now(),
-                    date: new Date().toISOString(),
-                    customerName: selectedDebt?.customerName,
-                    customerPhone: selectedDebt?.customerPhone,
-                    grandTotal: paymentAmount,
-                    total: paymentAmount,
-                    subtotal: paymentAmount, // For debt payment, use payment amount as subtotal
-                    paymentType: 'cash',
-                    items: [],
-                    cashierName: currentUser?.name,
-                    type: 'debt_payment'
-                  }}
-                  type="faktur"
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowDebtInvoice(false)}
-                  className="py-3 bg-secondary text-secondary-foreground rounded-lg font-medium hover:bg-secondary/80 transition-colors"
-                >
-                  Tutup
-                </button>
-                <button
-                  onClick={handleWhatsAppDebtInvoice}
-                  className="py-3 bg-success text-success-foreground rounded-lg font-medium hover:bg-success/90 transition-colors"
-                >
-                  Kirim WhatsApp
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Debt Export Modal */}
-      {showDebtExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-card rounded-xl shadow-elevated w-full max-w-md animate-scale-in">
-            <div className="p-6 border-b border-border">
-              <h3 className="text-lg font-bold text-foreground">Export Data Piutang</h3>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-3">
-                <button
-                  onClick={handleDebtExportToGoogleSheets}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
-                >
-                  <Cloud className="w-5 h-5 text-success" />
-                  <div className="text-left">
-                    <p className="font-medium text-foreground">Google Sheets</p>
-                    <p className="text-xs text-muted-foreground">Kirim data piutang ke Google Sheets</p>
-                  </div>
-                </button>
-                <button
-                  onClick={handleDebtExportToPDF}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors"
-                >
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <div className="text-left">
-                    <p className="font-medium text-foreground">PDF Preview</p>
-                    <p className="text-xs text-muted-foreground">Preview dan print laporan piutang</p>
-                  </div>
-                </button>
-              </div>
-            </div>
-            <div className="p-6 border-t border-border">
-              <button
-                onClick={() => setShowDebtExportModal(false)}
-                className="w-full py-3 bg-secondary text-secondary-foreground rounded-lg font-medium"
-              >
-                Batal
-              </button>
+              <button onClick={handleProcessDebtPayment} className="w-full py-3 primary-gradient text-primary-foreground rounded-lg font-semibold">Proses Pembayaran</button>
             </div>
           </div>
         </div>
